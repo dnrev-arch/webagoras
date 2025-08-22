@@ -67,6 +67,101 @@ function getBrazilTimeOnly() {
     });
 }
 
+// ========== FUNÇÃO DE LOCALIZAÇÃO COMPLETA (BASEADA NO CODE v2.7) ==========
+function getLocationByDDD(telefone) {
+    if (!telefone) return { cidade: 'Brasil', estado: '', regiao: 'Brasil', localizacao_completa: 'Brasil' };
+    
+    var numeroLimpo = telefone.replace(/\D/g, '');
+    var ddd = '';
+    
+    // Extrair DDD do telefone normalizado
+    if (numeroLimpo.length > 4 && numeroLimpo.indexOf("55") === 0) {
+        ddd = numeroLimpo.substring(2, 4);
+    } else if (numeroLimpo.length >= 2) {
+        ddd = numeroLimpo.substring(0, 2);
+    }
+    
+    // Mapeamento COMPLETO de todos os DDDs brasileiros (EXATO DO CODE v2.7)
+    var ddds = {
+        '11': { cidade: 'São Paulo', estado: 'SP', regiao: 'Grande São Paulo' },
+        '12': { cidade: 'São José dos Campos', estado: 'SP', regiao: 'Vale do Paraíba' },
+        '13': { cidade: 'Santos', estado: 'SP', regiao: 'Baixada Santista' },
+        '14': { cidade: 'Bauru', estado: 'SP', regiao: 'Interior de SP' },
+        '15': { cidade: 'Sorocaba', estado: 'SP', regiao: 'Interior de SP' },
+        '16': { cidade: 'Ribeirão Preto', estado: 'SP', regiao: 'Interior de SP' },
+        '17': { cidade: 'São José do Rio Preto', estado: 'SP', regiao: 'Interior de SP' },
+        '18': { cidade: 'Presidente Prudente', estado: 'SP', regiao: 'Interior de SP' },
+        '19': { cidade: 'Campinas', estado: 'SP', regiao: 'Região de Campinas' },
+        '21': { cidade: 'Rio de Janeiro', estado: 'RJ', regiao: 'Rio de Janeiro' },
+        '22': { cidade: 'Campos dos Goytacazes', estado: 'RJ', regiao: 'Norte Fluminense' },
+        '24': { cidade: 'Volta Redonda', estado: 'RJ', regiao: 'Sul Fluminense' },
+        '27': { cidade: 'Vitória', estado: 'ES', regiao: 'Grande Vitória' },
+        '28': { cidade: 'Cachoeiro de Itapemirim', estado: 'ES', regiao: 'Sul do ES' },
+        '31': { cidade: 'Belo Horizonte', estado: 'MG', regiao: 'Grande BH' },
+        '32': { cidade: 'Juiz de Fora', estado: 'MG', regiao: 'Zona da Mata' },
+        '33': { cidade: 'Governador Valadares', estado: 'MG', regiao: 'Vale do Rio Doce' },
+        '34': { cidade: 'Uberlândia', estado: 'MG', regiao: 'Triângulo Mineiro' },
+        '35': { cidade: 'Poços de Caldas', estado: 'MG', regiao: 'Sul de MG' },
+        '37': { cidade: 'Divinópolis', estado: 'MG', regiao: 'Centro-Oeste de MG' },
+        '38': { cidade: 'Montes Claros', estado: 'MG', regiao: 'Norte de MG' },
+        '41': { cidade: 'Curitiba', estado: 'PR', regiao: 'Grande Curitiba' },
+        '42': { cidade: 'Ponta Grossa', estado: 'PR', regiao: 'Campos Gerais' },
+        '43': { cidade: 'Londrina', estado: 'PR', regiao: 'Norte do Paraná' },
+        '44': { cidade: 'Maringá', estado: 'PR', regiao: 'Noroeste do Paraná' },
+        '45': { cidade: 'Foz do Iguaçu', estado: 'PR', regiao: 'Oeste do Paraná' },
+        '46': { cidade: 'Francisco Beltrão', estado: 'PR', regiao: 'Sudoeste do Paraná' },
+        '47': { cidade: 'Joinville', estado: 'SC', regiao: 'Norte de SC' },
+        '48': { cidade: 'Florianópolis', estado: 'SC', regiao: 'Grande Florianópolis' },
+        '49': { cidade: 'Chapecó', estado: 'SC', regiao: 'Oeste de SC' },
+        '51': { cidade: 'Porto Alegre', estado: 'RS', regiao: 'Grande Porto Alegre' },
+        '53': { cidade: 'Pelotas', estado: 'RS', regiao: 'Sul do RS' },
+        '54': { cidade: 'Caxias do Sul', estado: 'RS', regiao: 'Serra Gaúcha' },
+        '55': { cidade: 'Santa Maria', estado: 'RS', regiao: 'Centro do RS' },
+        '61': { cidade: 'Brasília', estado: 'DF', regiao: 'Distrito Federal' },
+        '62': { cidade: 'Goiânia', estado: 'GO', regiao: 'Grande Goiânia' },
+        '63': { cidade: 'Palmas', estado: 'TO', regiao: 'Tocantins' },
+        '64': { cidade: 'Rio Verde', estado: 'GO', regiao: 'Sudoeste Goiano' },
+        '65': { cidade: 'Cuiabá', estado: 'MT', regiao: 'Grande Cuiabá' },
+        '66': { cidade: 'Rondonópolis', estado: 'MT', regiao: 'Sul de MT' },
+        '67': { cidade: 'Campo Grande', estado: 'MS', regiao: 'Mato Grosso do Sul' },
+        '68': { cidade: 'Rio Branco', estado: 'AC', regiao: 'Acre' },
+        '69': { cidade: 'Porto Velho', estado: 'RO', regiao: 'Rondônia' },
+        '71': { cidade: 'Salvador', estado: 'BA', regiao: 'Grande Salvador' },
+        '73': { cidade: 'Ilhéus', estado: 'BA', regiao: 'Sul da Bahia' },
+        '74': { cidade: 'Juazeiro', estado: 'BA', regiao: 'Norte da Bahia' },
+        '75': { cidade: 'Feira de Santana', estado: 'BA', regiao: 'Recôncavo Baiano' },
+        '77': { cidade: 'Barreiras', estado: 'BA', regiao: 'Oeste da Bahia' },
+        '79': { cidade: 'Aracaju', estado: 'SE', regiao: 'Sergipe' },
+        '81': { cidade: 'Recife', estado: 'PE', regiao: 'Grande Recife' },
+        '82': { cidade: 'Maceió', estado: 'AL', regiao: 'Alagoas' },
+        '83': { cidade: 'João Pessoa', estado: 'PB', regiao: 'Paraíba' },
+        '84': { cidade: 'Natal', estado: 'RN', regiao: 'Rio Grande do Norte' },
+        '85': { cidade: 'Fortaleza', estado: 'CE', regiao: 'Grande Fortaleza' },
+        '86': { cidade: 'Teresina', estado: 'PI', regiao: 'Piauí' },
+        '87': { cidade: 'Petrolina', estado: 'PE', regiao: 'Sertão de PE' },
+        '88': { cidade: 'Sobral', estado: 'CE', regiao: 'Norte do Ceará' },
+        '89': { cidade: 'Picos', estado: 'PI', regiao: 'Sul do Piauí' },
+        '91': { cidade: 'Belém', estado: 'PA', regiao: 'Grande Belém' },
+        '92': { cidade: 'Manaus', estado: 'AM', regiao: 'Amazonas' },
+        '93': { cidade: 'Santarém', estado: 'PA', regiao: 'Oeste do Pará' },
+        '94': { cidade: 'Marabá', estado: 'PA', regiao: 'Sul do Pará' },
+        '95': { cidade: 'Boa Vista', estado: 'RR', regiao: 'Roraima' },
+        '96': { cidade: 'Macapá', estado: 'AP', regiao: 'Amapá' },
+        '97': { cidade: 'Coari', estado: 'AM', regiao: 'Médio Solimões' },
+        '98': { cidade: 'São Luís', estado: 'MA', regiao: 'Grande São Luís' },
+        '99': { cidade: 'Imperatriz', estado: 'MA', regiao: 'Sul do Maranhão' }
+    };
+    
+    var localizacao = ddds[ddd] || { cidade: 'Brasil', estado: '', regiao: 'Brasil' };
+    
+    // Adicionar campo localizacao_completa (EXATO DO CODE v2.7)
+    localizacao.localizacao_completa = localizacao.estado ? 
+        localizacao.cidade + '/' + localizacao.estado : 
+        localizacao.cidade;
+    
+    return localizacao;
+}
+
 // Função para adicionar evento ao histórico (com retenção de 24h)
 function addEventToHistory(eventType, status, data) {
     const event = {
@@ -217,11 +312,17 @@ app.post('/webhook/perfect', async (req, res) => {
         const amount = data.sale_amount || 0;
         const pixUrl = data.billet_url || '';
         
-        addLog('webhook_received', `Perfect: ${orderCode} | Status: ${status} | Produto: ${product} | Cliente: ${firstName} | Fone: ${phoneNumber}`);
+        // ========== CALCULAR LOCALIZAÇÃO ==========
+        const localizacao = getLocationByDDD(phoneNumber);
+        const dddCalculado = phoneNumber.length > 4 && phoneNumber.startsWith('55') 
+            ? phoneNumber.substring(2, 4) 
+            : phoneNumber.substring(0, 2);
+        
+        addLog('webhook_received', `Perfect: ${orderCode} | Status: ${status} | Produto: ${product} | Cliente: ${firstName} | Fone: ${phoneNumber} | Local: ${localizacao.localizacao_completa}`);
         
         if (status === 'approved') {
             // VENDA APROVADA
-            addLog('info', `✅ VENDA APROVADA - ${orderCode} | Produto: ${product}`);
+            addLog('info', `✅ VENDA APROVADA - ${orderCode} | Produto: ${product} | Local: ${localizacao.localizacao_completa}`);
             
             // Cancela timeout se existir
             if (pendingPixOrders.has(orderCode)) {
@@ -257,7 +358,7 @@ app.post('/webhook/perfect', async (req, res) => {
                 state.amount = amount; // Atualiza valor
             }
             
-            // Prepara dados para N8N
+            // Prepara dados para N8N COM LOCALIZAÇÃO
             const eventData = {
                 event_type: 'venda_aprovada',
                 produto: product,
@@ -273,6 +374,12 @@ app.post('/webhook/perfect', async (req, res) => {
                     valor: amount,
                     plano: planCode
                 },
+                // ========== DADOS DE LOCALIZAÇÃO (EXATO DO CODE v2.7) ==========
+                cidade: localizacao.cidade,
+                estado: localizacao.estado,
+                regiao: localizacao.regiao,
+                ddd: dddCalculado,
+                localizacao_completa: localizacao.localizacao_completa,
                 timestamp: new Date().toISOString(),
                 brazil_time: getBrazilTime(),
                 dados_originais: data
@@ -301,7 +408,7 @@ app.post('/webhook/perfect', async (req, res) => {
             
         } else if (status === 'pending') {
             // PIX GERADO - NÃO ENVIA PARA N8N IMEDIATAMENTE
-            addLog('info', `⏳ PIX GERADO - ${orderCode} | Produto: ${product} | Cliente: ${firstName}`);
+            addLog('info', `⏳ PIX GERADO - ${orderCode} | Produto: ${product} | Cliente: ${firstName} | Local: ${localizacao.localizacao_completa}`);
             
             // Cancela timeout anterior se existir
             if (pendingPixOrders.has(orderCode)) {
@@ -348,6 +455,12 @@ app.post('/webhook/perfect', async (req, res) => {
                         plano: planCode,
                         pix_url: pixUrl
                     },
+                    // ========== DADOS DE LOCALIZAÇÃO (EXATO DO CODE v2.7) ==========
+                    cidade: localizacao.cidade,
+                    estado: localizacao.estado,
+                    regiao: localizacao.regiao,
+                    ddd: dddCalculado,
+                    localizacao_completa: localizacao.localizacao_completa,
                     timestamp: new Date().toISOString(),
                     brazil_time: getBrazilTime(),
                     dados_originais: data
@@ -405,6 +518,7 @@ app.post('/webhook/perfect', async (req, res) => {
             message: 'Webhook Perfect processado',
             order_code: orderCode,
             product: product,
+            location: localizacao.localizacao_completa,
             instance: clientInstanceMap.has(phoneNumber) ? clientInstanceMap.get(phoneNumber).instance : null
         });
         
@@ -606,6 +720,12 @@ app.post('/webhook/evolution', async (req, res) => {
                 const fullName = clientState.client_name || messageData.pushName || 'Cliente';
                 const firstName = fullName.split(' ')[0];
                 
+                // ========== CALCULAR LOCALIZAÇÃO PARA RESPOSTA ==========
+                const localizacao = getLocationByDDD(clientNumber);
+                const dddCalculado = clientNumber.length > 4 && clientNumber.startsWith('55') 
+                    ? clientNumber.substring(2, 4) 
+                    : clientNumber.substring(0, 2);
+                
                 const eventData = {
                     event_type: 'resposta_01',
                     produto: clientState.product,
@@ -626,6 +746,12 @@ app.post('/webhook/evolution', async (req, res) => {
                         valor: clientState.amount || 0,
                         billet_url: clientState.pix_url || clientState.billet_url || '' // Link do PIX (se houver)
                     },
+                    // ========== DADOS DE LOCALIZAÇÃO (EXATO DO CODE v2.7) ==========
+                    cidade: localizacao.cidade,
+                    estado: localizacao.estado,
+                    regiao: localizacao.regiao,
+                    ddd: dddCalculado,
+                    localizacao_completa: localizacao.localizacao_completa,
                     timestamp: new Date().toISOString(),
                     brazil_time: getBrazilTime(),
                     dados_originais: data
@@ -833,12 +959,12 @@ app.get('/', (req, res) => {
     res.send(getHTMLContent());
 });
 
-// Função para gerar o HTML
+// Função para gerar o HTML (atualizada com indicador de localização)
 function getHTMLContent() {
     return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <title>Cérebro de Atendimento - Sistema Evolution</title>
+    <title>Cérebro de Atendimento - Sistema Evolution COM LOCALIZAÇÃO</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -923,6 +1049,11 @@ function getHTMLContent() {
         .config-value {
             color: var(--dark);
             font-family: monospace;
+        }
+        
+        .config-value.location-active {
+            color: var(--success);
+            font-weight: bold;
         }
         
         .stats-grid {
@@ -1226,12 +1357,12 @@ function getHTMLContent() {
     <div class="container">
         <div class="header">
             <h1><i class="fas fa-brain"></i> Cérebro de Atendimento</h1>
-            <div class="subtitle">Sistema Evolution - Gestão Inteligente de Leads</div>
+            <div class="subtitle">Sistema Evolution - Gestão Inteligente de Leads COM LOCALIZAÇÃO ✅</div>
             
             <div class="config-info">
                 <div class="config-item">
                     <span class="config-label">N8N Webhook URL:</span>
-                    <span class="config-value" id="n8n-url">https://n8n.flowzap.fun/webhook/atendimento-n8n</span>
+                    <span class="config-value" id="n8n-url">https://n8n.flowzap.fun/webhook/webhookagoras</span>
                 </div>
                 <div class="config-item">
                     <span class="config-label">Retenção de Dados:</span>
@@ -1240,6 +1371,10 @@ function getHTMLContent() {
                 <div class="config-item">
                     <span class="config-label">Timeout PIX:</span>
                     <span class="config-value">7 minutos</span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">🗺️ Localização por DDD:</span>
+                    <span class="config-value location-active">ATIVA ✅ (Baseada no CODE v2.7)</span>
                 </div>
                 <div class="config-item">
                     <span class="config-label">Horário:</span>
@@ -1531,7 +1666,12 @@ function getHTMLContent() {
                 html += '</div>';
                 
                 html += '<div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 10px;">';
-                html += '<h4 style="margin-bottom: 15px;">Configurações do Sistema</h4>';
+                html += '<h4 style="margin-bottom: 15px;">🎯 Funcionalidades Ativas</h4>';
+                html += '<p><strong>🗺️ Localização por DDD:</strong> ATIVA - Baseada no CODE v2.7</p>';
+                html += '<p><strong>📍 Mapeamento Completo:</strong> Todos os DDDs brasileiros mapeados</p>';
+                html += '<p><strong>🔄 Instâncias Fixas:</strong> ATIVO - Cliente sempre na mesma instância</p>';
+                html += '<p><strong>🛡️ Anti-duplicata:</strong> ATIVO - Proteção contra loops e duplicações</p>';
+                html += '<h4 style="margin: 20px 0 15px 0;">⚙️ Configurações do Sistema</h4>';
                 html += '<p><strong>N8N Webhook:</strong> ' + stats.n8n_webhook_url + '</p>';
                 html += '<p><strong>Horário:</strong> ' + stats.system.currentTime + '</p>';
                 html += '<p><strong>Iniciado em:</strong> ' + stats.system.startTime + '</p>';
@@ -1646,7 +1786,9 @@ function getHTMLContent() {
                 config: {
                     n8n_webhook_url: currentData.status ? currentData.status.n8n_webhook_url : 'N/A',
                     data_retention: '24 hours',
-                    pix_timeout: '7 minutes'
+                    pix_timeout: '7 minutes',
+                    localizacao: 'ATIVA - Baseada no CODE v2.7',
+                    funcionalidades: ['Localização por DDD', 'Instâncias Fixas', 'Anti-duplicata']
                 }
             };
             
@@ -1681,6 +1823,12 @@ app.get('/health', (req, res) => {
         active_conversations: conversationState.size,
         total_events: eventHistory.length,
         uptime: process.uptime(),
+        features: {
+            localizacao: 'ATIVA - Baseada no CODE v2.7',
+            instancias_fixas: 'ATIVA',
+            anti_duplicata: 'ATIVA',
+            timeout_pix: '7 minutos'
+        },
         config: {
             n8n_webhook_url: N8N_WEBHOOK_URL,
             data_retention: '24 hours',
@@ -1691,7 +1839,7 @@ app.get('/health', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    addLog('info', `🧠 CÉREBRO DE ATENDIMENTO v2.0 iniciado na porta ${PORT}`);
+    addLog('info', `🧠 CÉREBRO DE ATENDIMENTO v3.0 COM LOCALIZAÇÃO (CODE v2.7) iniciado na porta ${PORT}`);
     addLog('info', `📡 Webhook Perfect: http://localhost:${PORT}/webhook/perfect`);
     addLog('info', `📱 Webhook Evolution: http://localhost:${PORT}/webhook/evolution`);
     addLog('info', `🖥️ Painel de Controle: http://localhost:${PORT}`);
@@ -1699,17 +1847,25 @@ app.listen(PORT, () => {
     addLog('info', `📈 API Estatísticas: http://localhost:${PORT}/stats`);
     addLog('info', `🎯 N8N Webhook: ${N8N_WEBHOOK_URL}`);
     addLog('info', `🤖 Evolution API: ${EVOLUTION_API_URL}`);
+    addLog('info', `🗺️ Sistema de Localização: ATIVO (Baseado no CODE v2.7)`);
+    addLog('info', `📍 DDDs Mapeados: ${Object.keys(getLocationByDDD('5511999999999') !== null ? {
+        '11': 'São Paulo', '21': 'Rio de Janeiro', '31': 'Belo Horizonte',
+        '41': 'Curitiba', '51': 'Porto Alegre', '61': 'Brasília',
+        '71': 'Salvador', '81': 'Recife', '85': 'Fortaleza', '91': 'Belém'
+    } : {}).length}+ DDDs brasileiros`);
     addLog('info', `⏰ Timezone: America/Sao_Paulo (Horário de Brasília)`);
     addLog('info', `🗑️ Retenção de dados: 24 horas`);
     addLog('info', `⏱️ Timeout PIX: 7 minutos`);
     
-    console.log(`\n🧠 CÉREBRO DE ATENDIMENTO ATIVO`);
-    console.log(`================================`);
+    console.log(`\n🧠 CÉREBRO DE ATENDIMENTO v3.0 COM LOCALIZAÇÃO BASEADA NO CODE v2.7 ATIVO`);
+    console.log(`================================================================================`);
     console.log(`📡 Webhooks configurados:`);
     console.log(`   Perfect Pay: http://localhost:${PORT}/webhook/perfect`);
     console.log(`   Evolution: http://localhost:${PORT}/webhook/evolution`);
     console.log(`🎯 N8N: ${N8N_WEBHOOK_URL}`);
     console.log(`📊 Painel: http://localhost:${PORT}`);
+    console.log(`🗺️ LOCALIZAÇÃO: ATIVA com função exata do CODE v2.7`);
+    console.log(`📍 MAPEAMENTO: Todos os DDDs brasileiros incluídos`);
     console.log(`⏰ Horário: ${getBrazilTime()}`);
-    console.log(`================================\n`);
+    console.log(`================================================================================\n`);
 });
