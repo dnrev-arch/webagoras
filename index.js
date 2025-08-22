@@ -3,7 +3,7 @@ const axios = require('axios');
 const app = express();
 
 // Configurações
-const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8n.flowzap.fun/webhook/6ff6133e-1afd-48b6-bccb-ff5c1a35bc37';
+const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8n.flowzap.fun/webhook/webhookagoras';
 const EVOLUTION_API_URL = 'https://evo.flowzap.fun';
 const PIX_TIMEOUT = 7 * 60 * 1000; // 7 minutos
 const DATA_RETENTION_TIME = 24 * 60 * 60 * 1000; // 24 horas
@@ -244,6 +244,9 @@ app.post('/webhook/perfect', async (req, res) => {
                     last_system_message: null,
                     waiting_for_response: true, // SEMPRE ESPERA RESPOSTA APÓS APROVADA
                     client_name: fullName,
+                    amount: amount,
+                    pix_url: '', // Vazio para venda aprovada direto
+                    billet_url: '', // Vazio para venda aprovada direto
                     createdAt: new Date()
                 });
             } else {
@@ -251,6 +254,7 @@ app.post('/webhook/perfect', async (req, res) => {
                 state.original_event = 'aprovada';
                 state.instance = instance;
                 state.waiting_for_response = true; // MARCA COMO ESPERANDO RESPOSTA
+                state.amount = amount; // Atualiza valor
             }
             
             // Prepara dados para N8N
@@ -317,6 +321,9 @@ app.post('/webhook/perfect', async (req, res) => {
                 last_system_message: null,
                 waiting_for_response: true, // SEMPRE ESPERA RESPOSTA APÓS PIX
                 client_name: fullName,
+                amount: amount,
+                pix_url: pixUrl, // Salva o link do PIX
+                billet_url: pixUrl, // Salva também como billet_url
                 createdAt: new Date()
             });
             
@@ -595,14 +602,18 @@ app.post('/webhook/evolution', async (req, res) => {
                 addLog('info', `📥 PRIMEIRA RESPOSTA do cliente ${clientNumber}: "${messageContent.substring(0, 50)}..."`);
                 console.log('🚀 ENVIANDO RESPOSTA_01 PARA N8N');
                 
+                // Extrai apenas o primeiro nome
+                const fullName = clientState.client_name || messageData.pushName || 'Cliente';
+                const firstName = fullName.split(' ')[0];
+                
                 const eventData = {
                     event_type: 'resposta_01',
                     produto: clientState.product,
                     instancia: clientState.instance,
-                    evento_origem: clientState.original_event,
+                    evento_origem: clientState.original_event, // 'pix' ou 'aprovada'
                     cliente: {
                         telefone: clientNumber,
-                        nome: clientState.client_name || messageData.pushName || 'Cliente'
+                        nome: firstName // Apenas primeiro nome
                     },
                     resposta: {
                         numero: 1,
@@ -611,7 +622,9 @@ app.post('/webhook/evolution', async (req, res) => {
                         brazil_time: getBrazilTime()
                     },
                     pedido: {
-                        codigo: clientState.order_code
+                        codigo: clientState.order_code,
+                        valor: clientState.amount || 0,
+                        billet_url: clientState.pix_url || clientState.billet_url || '' // Link do PIX (se houver)
                     },
                     timestamp: new Date().toISOString(),
                     brazil_time: getBrazilTime(),
