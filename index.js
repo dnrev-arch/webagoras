@@ -43,6 +43,7 @@ const INSTANCES = [
     { name: 'G05', id: '118E0162F12C-4841-ADD6-33E11DDB341A' },
     { name: 'G06', id: '4AC271E7BBEA-4A2B-BB2D-3583BDE4AE1E' },
     { name: 'G07T', id: 'E28170C3375C-4116-8723-144CC9B90994' },
+    { name: 'G08', id: 'A63C380B277D-4A5E-9ECD-48710291E5A6' },
 ];
 
 app.use(express.json());
