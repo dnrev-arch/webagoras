@@ -3,7 +3,7 @@ const axios = require('axios');
 const app = express();
 
 // Configurações
-const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8n.flowzap.fun/webhook/6ff6133e-1afd-48b6-bccb-ff5c1a35bc37';
+const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8n.flowzap.fun/webhook/atendimento-n8n';
 const EVOLUTION_API_URL = 'https://evo.flowzap.fun';
 const PIX_TIMEOUT = 7 * 60 * 1000; // 7 minutos
 const DATA_RETENTION_TIME = 24 * 60 * 60 * 1000; // 24 horas
@@ -26,23 +26,25 @@ let systemStats = {
 
 // Mapeamento dos produtos
 const PRODUCT_MAPPING = {
-    'PPLQQMOVD': 'FAB',
-    'PPLQQMOVH': 'FAB', 
-    'PPLQQMOVG': 'FAB',
-    'PPLQQN0AL': 'NAT',
-    'PPLQQN7T4': 'CS',
-    'PPLQQMBIL': 'CS'
+    'PPLQQM9AP': 'FAB',
+    'PPLQQMAGU': 'FAB', 
+    'PPLQQMADF': 'FAB',
+    'PPLQQN0FT': 'NAT',
+    'PPLQQMSFH': 'CS',
+    'PPLQQMSFI': 'CS'
 };
 
 // Instâncias disponíveis (sem verificação de conexão)
 const INSTANCES = [
-    { name: 'G01', id: '584F8ACCAA48-488D-A26E-E75E1A5B2994' },
-    { name: 'G02', id: '2E2C41AB88F9-4356-B866-9ADA88530FD0' },
-    { name: 'G03', id: '9AFECAC9683B-4611-8C51-933447B70905' },
-    { name: 'G04', id: 'C974682BB258-4756-98F0-CF6D90FC2755' },
-    { name: 'G05', id: '118E0162F12C-4841-ADD6-33E11DDB341A' },
-    { name: 'G06', id: '4AC271E7BBEA-4A2B-BB2D-3583BDE4AE1E' },
-    { name: 'G07T', id: 'E28170C3375C-4116-8723-144CC9B90994' },
+    { name: 'GABY01', id: '1CEBB8703497-4F31-B33F-335A4233D2FE' },
+    { name: 'GABY02', id: '939E26DEA1FA-40D4-83CE-2BF0B3F795DC' },
+    { name: 'GABY03', id: 'F819629B5E33-435B-93BB-091B4C104C12' },
+    { name: 'GABY04', id: 'D555A7CBC0B3-425B-8E20-975232BE75F6' },
+    { name: 'GABY05', id: 'D97A63B8B05B-430E-98C1-61977A51EC0B' },
+    { name: 'GABY06', id: '6FC2C4C703BA-4A8A-9B3B-21536AE51323' },
+    { name: 'GABY07', id: '14F637AB35CD-448D-BF66-5673950FBA10' },
+    { name: 'GABY08', id: '82E0CE5B1A51-4B7B-BBEF-77D22320B482' },
+    { name: 'GABY09', id: 'B5783C928EF4-4DB0-ABBA-AF6913116E7B' }
 ];
 
 app.use(express.json());
