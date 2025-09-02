@@ -9,21 +9,6 @@ const PIX_TIMEOUT = 7 * 60 * 1000; // 7 minutos
 const DATA_RETENTION_TIME = 24 * 60 * 60 * 1000; // 24 horas
 const CLEANUP_INTERVAL = 10 * 60 * 1000; // 10 minutos
 
-// ========== CONFIGURAÇÕES DAS NOVAS FUNCIONALIDADES ==========
-const FEATURES = {
-    VCARD_ENABLED: true, // Ativar/desativar envio de vCard
-    FACEBOOK_CAPI_ENABLED: true, // Ativar/desativar Facebook Conversions API
-    ENHANCED_LOCATION: true, // Ativar/desativar saudações regionalizadas
-    ADVANCED_DASHBOARD: true // Ativar/desativar dashboard avançado
-};
-
-// Configurações Facebook CAPI (preencher com seus dados)
-const FACEBOOK_CONFIG = {
-    ACCESS_TOKEN: process.env.FB_ACCESS_TOKEN || '', // Adicionar no ambiente
-    PIXEL_ID: process.env.FB_PIXEL_ID || '', // Adicionar no ambiente
-    TEST_EVENT_CODE: process.env.FB_TEST_CODE || '' // Para testes, deixar vazio em produção
-};
-
 // Armazenamento em memória com timestamps
 let pendingPixOrders = new Map();
 let systemLogs = [];
@@ -38,9 +23,6 @@ let systemStats = {
     failedEvents: 0,
     startTime: new Date()
 };
-
-// ========== NOVAS MÉTRICAS POR INSTÂNCIA ==========
-let instanceMetrics = new Map(); // Métricas detalhadas por instância
 
 // Mapeamento dos produtos
 const PRODUCT_MAPPING = {
@@ -63,6 +45,7 @@ const INSTANCES = [
     { name: 'G08', id: 'A63C380B277D-4A5E-9ECD-48710291E5A6' },
     { name: 'G09', id: 'E667206D3C72-4F8B-AD10-F933F273A39B' },
     { name: 'G10', id: 'D6932E02E658-40BD-9784-8932841CCFA4' },
+    
 ];
 
 app.use(express.json());
@@ -179,163 +162,6 @@ function getLocationByDDD(telefone) {
         localizacao.cidade;
     
     return localizacao;
-}
-
-// ========== NOVA FUNÇÃO: SAUDAÇÕES REGIONALIZADAS ==========
-function getRegionalGreeting(localizacao) {
-    if (!FEATURES.ENHANCED_LOCATION) {
-        return '';
-    }
-    
-    const hour = new Date().getHours();
-    let timeGreeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
-    
-    // Saudações regionais específicas
-    const regionalGreetings = {
-        'BA': ['Oxe', 'Meu rei', 'Painho'],
-        'RJ': ['Fala aí', 'Qual é', 'Papo reto'],
-        'RS': ['Bah', 'Tchê', 'Tri legal'],
-        'MG': ['Uai', 'Trem bom', 'Sô'],
-        'SP': ['Meu', 'Mano', 'Tá ligado'],
-        'PE': ['Oxente', 'Visse', 'Cabra'],
-        'CE': ['Eita', 'Macho', 'Mermão']
-    };
-    
-    const estado = localizacao.estado;
-    let greeting = timeGreeting;
-    
-    if (regionalGreetings[estado]) {
-        const regional = regionalGreetings[estado][Math.floor(Math.random() * regionalGreetings[estado].length)];
-        greeting = `${regional}! ${timeGreeting}`;
-    }
-    
-    return greeting;
-}
-
-// ========== NOVA FUNÇÃO: GERAR VCARD ==========
-function generateVCard(name, phone, company = 'Suporte') {
-    if (!FEATURES.VCARD_ENABLED) {
-        return null;
-    }
-    
-    const vcard = `BEGIN:VCARD
-VERSION:3.0
-FN:${name}
-ORG:${company}
-TEL;TYPE=CELL:${phone}
-END:VCARD`;
-    
-    return Buffer.from(vcard).toString('base64');
-}
-
-// ========== NOVA FUNÇÃO: ENVIAR EVENTO PARA FACEBOOK CAPI ==========
-async function sendFacebookEvent(eventName, eventData) {
-    if (!FEATURES.FACEBOOK_CAPI_ENABLED || !FACEBOOK_CONFIG.ACCESS_TOKEN || !FACEBOOK_CONFIG.PIXEL_ID) {
-        return { success: false, message: 'Facebook CAPI não configurado' };
-    }
-    
-    try {
-        const fbEvent = {
-            data: [{
-                event_name: eventName,
-                event_time: Math.floor(Date.now() / 1000),
-                event_source_url: 'https://seu-dominio.com', // Substituir pelo seu domínio
-                user_data: {
-                    ph: eventData.phone ? hashPhone(eventData.phone) : undefined,
-                    fn: eventData.firstName ? hashString(eventData.firstName.toLowerCase()) : undefined,
-                    ct: eventData.city ? hashString(eventData.city.toLowerCase()) : undefined,
-                    st: eventData.state ? hashString(eventData.state.toLowerCase()) : undefined,
-                    country: hashString('br'),
-                    external_id: eventData.externalId ? hashString(eventData.externalId) : undefined
-                },
-                custom_data: {
-                    currency: 'BRL',
-                    value: eventData.value || 0,
-                    content_name: eventData.product,
-                    content_category: 'Product',
-                    content_ids: [eventData.orderCode],
-                    contents: [{
-                        id: eventData.orderCode,
-                        quantity: 1
-                    }]
-                },
-                action_source: 'website'
-            }],
-            ...(FACEBOOK_CONFIG.TEST_EVENT_CODE && { test_event_code: FACEBOOK_CONFIG.TEST_EVENT_CODE })
-        };
-        
-        const url = `https://graph.facebook.com/v18.0/${FACEBOOK_CONFIG.PIXEL_ID}/events`;
-        
-        const response = await axios.post(url, fbEvent, {
-            params: {
-                access_token: FACEBOOK_CONFIG.ACCESS_TOKEN
-            }
-        });
-        
-        return { success: true, data: response.data };
-    } catch (error) {
-        addLog('error', `Erro ao enviar evento Facebook: ${error.message}`);
-        return { success: false, error: error.message };
-    }
-}
-
-// Função auxiliar para hash (Facebook requer dados hasheados)
-function hashString(str) {
-    const crypto = require('crypto');
-    return crypto.createHash('sha256').update(str).digest('hex');
-}
-
-function hashPhone(phone) {
-    // Remove caracteres não numéricos e hash
-    const cleaned = phone.replace(/\D/g, '');
-    return hashString(cleaned);
-}
-
-// ========== ATUALIZAR MÉTRICAS POR INSTÂNCIA ==========
-function updateInstanceMetrics(instanceName, metricType, value = 1) {
-    if (!FEATURES.ADVANCED_DASHBOARD) return;
-    
-    if (!instanceMetrics.has(instanceName)) {
-        instanceMetrics.set(instanceName, {
-            messagessSent: 0,
-            responsesReceived: 0,
-            conversions: 0,
-            pixGenerated: 0,
-            pixTimeout: 0,
-            lastActivity: new Date(),
-            activeConversations: 0,
-            totalRevenue: 0
-        });
-    }
-    
-    const metrics = instanceMetrics.get(instanceName);
-    
-    switch(metricType) {
-        case 'message_sent':
-            metrics.messagesSent += value;
-            break;
-        case 'response_received':
-            metrics.responsesReceived += value;
-            break;
-        case 'conversion':
-            metrics.conversions += value;
-            break;
-        case 'pix_generated':
-            metrics.pixGenerated += value;
-            break;
-        case 'pix_timeout':
-            metrics.pixTimeout += value;
-            break;
-        case 'revenue':
-            metrics.totalRevenue += value;
-            break;
-        case 'active_conversation':
-            metrics.activeConversations = value;
-            break;
-    }
-    
-    metrics.lastActivity = new Date();
-    instanceMetrics.set(instanceName, metrics);
 }
 
 // Função para adicionar evento ao histórico (com retenção de 24h)
@@ -510,22 +336,6 @@ app.post('/webhook/perfect', async (req, res) => {
             // Obtém instância sticky para o cliente
             const instance = getInstanceForClient(phoneNumber);
             
-            // Atualiza métricas da instância
-            updateInstanceMetrics(instance, 'conversion', 1);
-            updateInstanceMetrics(instance, 'revenue', amount);
-            
-            // Envia evento para Facebook CAPI
-            await sendFacebookEvent('Purchase', {
-                phone: phoneNumber,
-                firstName: firstName,
-                city: localizacao.cidade,
-                state: localizacao.estado,
-                value: amount,
-                product: product,
-                orderCode: orderCode,
-                externalId: phoneNumber
-            });
-            
             // Cria/atualiza estado da conversa para aprovada
             if (!conversationState.has(phoneNumber)) {
                 conversationState.set(phoneNumber, {
@@ -540,7 +350,6 @@ app.post('/webhook/perfect', async (req, res) => {
                     amount: amount,
                     pix_url: '', // Vazio para venda aprovada direto
                     billet_url: '', // Vazio para venda aprovada direto
-                    vcard_sent: false, // Novo campo para controlar envio de vCard
                     createdAt: new Date()
                 });
             } else {
@@ -573,7 +382,6 @@ app.post('/webhook/perfect', async (req, res) => {
                 regiao: localizacao.regiao,
                 ddd: dddCalculado,
                 localizacao_completa: localizacao.localizacao_completa,
-                saudacao_regional: getRegionalGreeting(localizacao), // NOVA SAUDAÇÃO
                 timestamp: new Date().toISOString(),
                 brazil_time: getBrazilTime(),
                 dados_originais: data
@@ -612,21 +420,6 @@ app.post('/webhook/perfect', async (req, res) => {
             // Obtém instância sticky para o cliente
             const instance = getInstanceForClient(phoneNumber);
             
-            // Atualiza métricas
-            updateInstanceMetrics(instance, 'pix_generated', 1);
-            
-            // Envia evento para Facebook CAPI
-            await sendFacebookEvent('InitiateCheckout', {
-                phone: phoneNumber,
-                firstName: firstName,
-                city: localizacao.cidade,
-                state: localizacao.estado,
-                value: amount,
-                product: product,
-                orderCode: orderCode,
-                externalId: phoneNumber
-            });
-            
             // Cria estado da conversa
             conversationState.set(phoneNumber, {
                 order_code: orderCode,
@@ -640,7 +433,6 @@ app.post('/webhook/perfect', async (req, res) => {
                 amount: amount,
                 pix_url: pixUrl, // Salva o link do PIX
                 billet_url: pixUrl, // Salva também como billet_url
-                vcard_sent: false,
                 createdAt: new Date()
             });
             
@@ -648,9 +440,6 @@ app.post('/webhook/perfect', async (req, res) => {
             const timeout = setTimeout(async () => {
                 addLog('timeout', `⏰ TIMEOUT PIX: ${orderCode} - Enviando PIX não pago`);
                 pendingPixOrders.delete(orderCode);
-                
-                // Atualiza métricas
-                updateInstanceMetrics(instance, 'pix_timeout', 1);
                 
                 const eventData = {
                     event_type: 'pix_timeout',
@@ -674,7 +463,6 @@ app.post('/webhook/perfect', async (req, res) => {
                     regiao: localizacao.regiao,
                     ddd: dddCalculado,
                     localizacao_completa: localizacao.localizacao_completa,
-                    saudacao_regional: getRegionalGreeting(localizacao), // NOVA SAUDAÇÃO
                     timestamp: new Date().toISOString(),
                     brazil_time: getBrazilTime(),
                     dados_originais: data
@@ -880,7 +668,6 @@ app.post('/webhook/evolution', async (req, res) => {
                 last_system_message: new Date(),
                 waiting_for_response: true, // Marca como esperando resposta
                 client_name: messageData.pushName || 'Cliente Teste',
-                vcard_sent: false,
                 createdAt: new Date()
             });
             addLog('info', `🧪 Estado de teste criado para ${clientNumber}`);
@@ -904,18 +691,6 @@ app.post('/webhook/evolution', async (req, res) => {
             // MENSAGEM ENVIADA PELO SISTEMA
             clientState.last_system_message = new Date();
             clientState.waiting_for_response = true;
-            
-            // Envia vCard na primeira mensagem se habilitado
-            if (FEATURES.VCARD_ENABLED && !clientState.vcard_sent) {
-                // Aqui você pode implementar o envio do vCard através da Evolution API
-                // Por enquanto, apenas marca como enviado
-                clientState.vcard_sent = true;
-                addLog('info', `📇 vCard marcado para envio para ${clientNumber}`);
-            }
-            
-            // Atualiza métricas
-            updateInstanceMetrics(finalInstanceName, 'message_sent', 1);
-            
             addLog('info', `📤 Sistema enviou mensagem para ${clientNumber} via ${finalInstanceName}`);
             
             // Adiciona ao histórico local
@@ -939,9 +714,6 @@ app.post('/webhook/evolution', async (req, res) => {
                 // APENAS A PRIMEIRA RESPOSTA
                 clientState.response_count = 1;
                 clientState.waiting_for_response = false;
-                
-                // Atualiza métricas
-                updateInstanceMetrics(finalInstanceName, 'response_received', 1);
                 
                 addLog('info', `📥 PRIMEIRA RESPOSTA do cliente ${clientNumber}: "${messageContent.substring(0, 50)}..."`);
                 console.log('🚀 ENVIANDO RESPOSTA_01 PARA N8N');
@@ -982,7 +754,6 @@ app.post('/webhook/evolution', async (req, res) => {
                     regiao: localizacao.regiao,
                     ddd: dddCalculado,
                     localizacao_completa: localizacao.localizacao_completa,
-                    saudacao_regional: getRegionalGreeting(localizacao), // NOVA SAUDAÇÃO
                     timestamp: new Date().toISOString(),
                     brazil_time: getBrazilTime(),
                     dados_originais: data
@@ -1067,7 +838,7 @@ async function sendToN8N(eventData, eventType) {
 
 // API Endpoints
 
-// Status principal (EXPANDIDO COM NOVAS MÉTRICAS)
+// Status principal
 app.get('/status', (req, res) => {
     const pendingList = Array.from(pendingPixOrders.entries()).map(([code, order]) => ({
         code: code,
@@ -1091,7 +862,6 @@ app.get('/status', (req, res) => {
         waiting_for_response: state.waiting_for_response,
         original_event: state.original_event,
         client_name: state.client_name,
-        vcard_sent: state.vcard_sent,
         created_at: state.createdAt,
         created_at_brazil: state.createdAt ? state.createdAt.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : null
     }));
@@ -1105,25 +875,6 @@ app.get('/status', (req, res) => {
         resposta_01: deliveryReports.filter(r => r.type === 'resposta_01').length
     };
     
-    // Prepara métricas por instância
-    const instanceStats = [];
-    for (const [name, metrics] of instanceMetrics.entries()) {
-        // Calcula conversas ativas para esta instância
-        const activeCount = conversationList.filter(c => c.instance === name).length;
-        metrics.activeConversations = activeCount;
-        
-        instanceStats.push({
-            instance: name,
-            ...metrics,
-            conversionRate: metrics.pixGenerated > 0 
-                ? ((metrics.conversions / metrics.pixGenerated) * 100).toFixed(2) + '%'
-                : '0%',
-            responseRate: metrics.messagesSent > 0
-                ? ((metrics.responsesReceived / metrics.messagesSent) * 100).toFixed(2) + '%'
-                : '0%'
-        });
-    }
-    
     const recentLogs = systemLogs.slice(-100);
     
     res.json({
@@ -1131,8 +882,6 @@ app.get('/status', (req, res) => {
         timestamp: new Date().toISOString(),
         brazil_time: getBrazilTime(),
         uptime: process.uptime(),
-        features_enabled: FEATURES,
-        facebook_capi_configured: !!FACEBOOK_CONFIG.ACCESS_TOKEN,
         pending_pix_orders: pendingPixOrders.size,
         active_conversations: conversationState.size,
         client_instance_mappings: clientInstanceMap.size,
@@ -1140,7 +889,6 @@ app.get('/status', (req, res) => {
         conversations: conversationList,
         delivery_reports: reportStats,
         system_stats: systemStats,
-        instance_metrics: instanceStats, // NOVAS MÉTRICAS POR INSTÂNCIA
         logs_last_hour: recentLogs,
         evolution_api_url: EVOLUTION_API_URL,
         n8n_webhook_url: N8N_WEBHOOK_URL, // URL fixa do N8N
@@ -1174,22 +922,11 @@ app.get('/events', (req, res) => {
     });
 });
 
-// Estatísticas do sistema (EXPANDIDO)
+// Estatísticas do sistema
 app.get('/stats', (req, res) => {
     const uptime = process.uptime();
     const uptimeHours = Math.floor(uptime / 3600);
     const uptimeMinutes = Math.floor((uptime % 3600) / 60);
-    
-    // Calcula estatísticas agregadas das instâncias
-    let totalRevenue = 0;
-    let totalConversions = 0;
-    let totalPixGenerated = 0;
-    
-    for (const [name, metrics] of instanceMetrics.entries()) {
-        totalRevenue += metrics.totalRevenue || 0;
-        totalConversions += metrics.conversions || 0;
-        totalPixGenerated += metrics.pixGenerated || 0;
-    }
     
     res.json({
         system: {
@@ -1215,30 +952,21 @@ app.get('/stats', (req, res) => {
             eventsLast24h: eventHistory.length, // Já filtrado para 24h
             totalEvents: eventHistory.length
         },
-        revenue: {
-            total: `R$ ${totalRevenue.toFixed(2)}`,
-            conversions: totalConversions,
-            pixGenerated: totalPixGenerated,
-            conversionRate: totalPixGenerated > 0
-                ? ((totalConversions / totalPixGenerated) * 100).toFixed(2) + '%'
-                : '0%'
-        },
-        features: FEATURES,
         n8n_webhook_url: N8N_WEBHOOK_URL
     });
 });
 
-// Servir arquivo HTML (DASHBOARD EXPANDIDO)
+// Servir arquivo HTML
 app.get('/', (req, res) => {
     res.send(getHTMLContent());
 });
 
-// Função para gerar o HTML (EXPANDIDO COM NOVAS FUNCIONALIDADES)
+// Função para gerar o HTML (atualizada com indicador de localização)
 function getHTMLContent() {
     return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <title>Cérebro de Atendimento - Sistema Evolution ENHANCED</title>
+    <title>Cérebro de Atendimento - Sistema Evolution COM LOCALIZAÇÃO</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -1257,7 +985,6 @@ function getHTMLContent() {
             --gray: #718096;
             --light: #f7fafc;
             --white: #ffffff;
-            --facebook: #1877f2;
         }
         
         body { 
@@ -1295,36 +1022,6 @@ function getHTMLContent() {
             color: var(--gray);
             font-size: 1rem;
             margin-bottom: 20px;
-        }
-        
-        .feature-badges {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 20px;
-        }
-        
-        .feature-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: white;
-        }
-        
-        .feature-badge.active {
-            background: var(--success);
-        }
-        
-        .feature-badge.inactive {
-            background: var(--gray);
-        }
-        
-        .feature-badge.facebook {
-            background: var(--facebook);
         }
         
         .config-info {
@@ -1385,7 +1082,6 @@ function getHTMLContent() {
         .stat-card.warning { border-left: 4px solid var(--warning); }
         .stat-card.info { border-left: 4px solid var(--info); }
         .stat-card.danger { border-left: 4px solid var(--danger); }
-        .stat-card.facebook { border-left: 4px solid var(--facebook); }
         
         .stat-label {
             font-size: 0.9rem;
@@ -1570,11 +1266,6 @@ function getHTMLContent() {
             color: #2c5282;
         }
         
-        .badge-facebook {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-        
         .empty-state {
             text-align: center;
             padding: 60px 20px;
@@ -1653,49 +1344,6 @@ function getHTMLContent() {
             color: #666;
         }
         
-        .instance-metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-        
-        .instance-card {
-            background: white;
-            border-radius: 15px;
-            padding: 20px;
-            border: 1px solid #e2e8f0;
-        }
-        
-        .instance-card h4 {
-            color: var(--dark);
-            margin-bottom: 15px;
-            font-size: 1.1rem;
-        }
-        
-        .instance-metrics {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-        
-        .metric-item {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .metric-label {
-            font-size: 0.75rem;
-            color: var(--gray);
-            text-transform: uppercase;
-        }
-        
-        .metric-value {
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: var(--dark);
-        }
-        
         @media (max-width: 768px) {
             body { padding: 10px; }
             .container { padding: 0; }
@@ -1710,12 +1358,8 @@ function getHTMLContent() {
 <body>
     <div class="container">
         <div class="header">
-            <h1><i class="fas fa-brain"></i> Cérebro de Atendimento ENHANCED</h1>
-            <div class="subtitle">Sistema Evolution - Gestão Inteligente com vCard, Facebook CAPI e Dashboard Avançado</div>
-            
-            <div class="feature-badges" id="feature-badges">
-                <!-- Badges serão inseridos dinamicamente -->
-            </div>
+            <h1><i class="fas fa-brain"></i> Cérebro de Atendimento</h1>
+            <div class="subtitle">Sistema Evolution - Gestão Inteligente de Leads COM LOCALIZAÇÃO ✅</div>
             
             <div class="config-info">
                 <div class="config-item">
@@ -1732,7 +1376,7 @@ function getHTMLContent() {
                 </div>
                 <div class="config-item">
                     <span class="config-label">🗺️ Localização por DDD:</span>
-                    <span class="config-value location-active">ATIVA ✅ (Com Saudações Regionais)</span>
+                    <span class="config-value location-active">ATIVA ✅ (Baseada no CODE v2.7)</span>
                 </div>
                 <div class="config-item">
                     <span class="config-label">Horário:</span>
@@ -1759,10 +1403,10 @@ function getHTMLContent() {
                     <div class="stat-change">Últimas 24h</div>
                 </div>
                 
-                <div class="stat-card facebook">
-                    <div class="stat-label"><i class="fab fa-facebook"></i> Taxa Conversão</div>
-                    <div class="stat-value" id="conversion-rate">0%</div>
-                    <div class="stat-change" id="conversion-change">Global</div>
+                <div class="stat-card danger">
+                    <div class="stat-label"><i class="fas fa-exclamation-triangle"></i> PIX Timeout</div>
+                    <div class="stat-value" id="pix-timeout">0</div>
+                    <div class="stat-change">Últimas 24h</div>
                 </div>
             </div>
             
@@ -1783,9 +1427,6 @@ function getHTMLContent() {
             <div class="tabs">
                 <button class="tab active" onclick="switchTab(event, 'events')">
                     <i class="fas fa-list"></i> Eventos (24h)
-                </button>
-                <button class="tab" onclick="switchTab(event, 'instances')">
-                    <i class="fas fa-server"></i> Instâncias
                 </button>
                 <button class="tab" onclick="switchTab(event, 'pending')">
                     <i class="fas fa-hourglass-half"></i> PIX Pendentes
@@ -1841,9 +1482,6 @@ function getHTMLContent() {
                 case 'events':
                     loadEventsTab();
                     break;
-                case 'instances':
-                    loadInstancesTab();
-                    break;
                 case 'pending':
                     loadPendingTab();
                     break;
@@ -1857,38 +1495,6 @@ function getHTMLContent() {
                     loadStatsTab();
                     break;
             }
-        }
-        
-        // Aba de Instâncias (NOVA)
-        async function loadInstancesTab() {
-            const content = document.getElementById('tab-content');
-            
-            if (!currentData.status || !currentData.status.instance_metrics || currentData.status.instance_metrics.length === 0) {
-                content.innerHTML = '<div class="empty-state"><i class="fas fa-server"></i><h3>Nenhuma métrica de instância disponível</h3><p>As métricas aparecerão quando houver atividade</p></div>';
-                return;
-            }
-            
-            let html = '<h3 style="margin-bottom: 20px;">Métricas por Instância</h3>';
-            html += '<div class="instance-metrics-grid">';
-            
-            currentData.status.instance_metrics.forEach(metrics => {
-                html += '<div class="instance-card">';
-                html += '<h4><i class="fas fa-mobile-alt"></i> ' + metrics.instance + '</h4>';
-                html += '<div class="instance-metrics">';
-                html += '<div class="metric-item"><span class="metric-label">Mensagens Enviadas</span><span class="metric-value">' + (metrics.messagesSent || 0) + '</span></div>';
-                html += '<div class="metric-item"><span class="metric-label">Respostas</span><span class="metric-value">' + (metrics.responsesReceived || 0) + '</span></div>';
-                html += '<div class="metric-item"><span class="metric-label">Conversões</span><span class="metric-value">' + (metrics.conversions || 0) + '</span></div>';
-                html += '<div class="metric-item"><span class="metric-label">PIX Gerados</span><span class="metric-value">' + (metrics.pixGenerated || 0) + '</span></div>';
-                html += '<div class="metric-item"><span class="metric-label">Taxa Conversão</span><span class="metric-value">' + metrics.conversionRate + '</span></div>';
-                html += '<div class="metric-item"><span class="metric-label">Taxa Resposta</span><span class="metric-value">' + metrics.responseRate + '</span></div>';
-                html += '<div class="metric-item"><span class="metric-label">Conversas Ativas</span><span class="metric-value">' + metrics.activeConversations + '</span></div>';
-                html += '<div class="metric-item"><span class="metric-label">Receita Total</span><span class="metric-value">R$ ' + (metrics.totalRevenue || 0).toFixed(2) + '</span></div>';
-                html += '</div>';
-                html += '</div>';
-            });
-            
-            html += '</div>';
-            content.innerHTML = html;
         }
         
         // Aba de Eventos
@@ -2001,13 +1607,9 @@ function getHTMLContent() {
                 html += '<div class="conversation-item">';
                 html += '<div class="conversation-header">';
                 html += '<strong>' + (conv.client_name || 'Cliente') + ' - ' + conv.phone + '</strong>';
-                html += '<div>';
-                if (conv.vcard_sent) {
-                    html += '<span class="badge badge-facebook" style="margin-right: 5px;">vCard Enviado</span>';
-                }
-                html += '<span class="badge badge-' + (conv.waiting_for_response ? 'warning' : 'success') + '">';
-                html += (conv.waiting_for_response ? 'Aguardando Resposta' : 'Respondido') + '</span>';
-                html += '</div></div>';
+                html += '<div><span class="badge badge-' + (conv.waiting_for_response ? 'warning' : 'success') + '">';
+                html += (conv.waiting_for_response ? 'Aguardando Resposta' : 'Respondido') + '</span></div>';
+                html += '</div>';
                 html += '<div class="conversation-details">';
                 html += '<div class="detail-item"><span class="detail-label">Pedido</span><span class="detail-value">' + conv.order_code + '</span></div>';
                 html += '<div class="detail-item"><span class="detail-label">Produto</span><span class="detail-value">' + conv.product + '</span></div>';
@@ -2060,22 +1662,19 @@ function getHTMLContent() {
                 html += '<div class="stat-value">' + stats.history.eventsLast24h + '</div>';
                 html += '<div class="stat-change">Com retenção de 24 horas</div></div>';
                 
-                html += '<div class="stat-card facebook"><div class="stat-label">Receita Total</div>';
-                html += '<div class="stat-value">' + stats.revenue.total + '</div>';
-                html += '<div class="stat-change">' + stats.revenue.conversions + ' conversões de ' + stats.revenue.pixGenerated + ' PIX</div></div>';
+                html += '<div class="stat-card warning"><div class="stat-label">Ativos Agora</div>';
+                html += '<div class="stat-value">' + (stats.current.pendingPix + stats.current.activeConversations) + '</div>';
+                html += '<div class="stat-change">' + stats.current.pendingPix + ' PIX, ' + stats.current.activeConversations + ' conversas</div></div>';
                 html += '</div>';
                 
                 html += '<div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 10px;">';
                 html += '<h4 style="margin-bottom: 15px;">🎯 Funcionalidades Ativas</h4>';
-                html += '<p><strong>🗺️ Localização por DDD:</strong> ' + (stats.features.ENHANCED_LOCATION ? 'ATIVA com Saudações Regionais' : 'DESATIVADA') + '</p>';
-                html += '<p><strong>📇 Sistema vCard:</strong> ' + (stats.features.VCARD_ENABLED ? 'ATIVO' : 'DESATIVADO') + '</p>';
-                html += '<p><strong>📊 Facebook CAPI:</strong> ' + (stats.features.FACEBOOK_CAPI_ENABLED ? 'ATIVO' : 'DESATIVADO') + '</p>';
-                html += '<p><strong>📈 Dashboard Avançado:</strong> ' + (stats.features.ADVANCED_DASHBOARD ? 'ATIVO' : 'DESATIVADO') + '</p>';
+                html += '<p><strong>🗺️ Localização por DDD:</strong> ATIVA - Baseada no CODE v2.7</p>';
+                html += '<p><strong>📍 Mapeamento Completo:</strong> Todos os DDDs brasileiros mapeados</p>';
                 html += '<p><strong>🔄 Instâncias Fixas:</strong> ATIVO - Cliente sempre na mesma instância</p>';
                 html += '<p><strong>🛡️ Anti-duplicata:</strong> ATIVO - Proteção contra loops e duplicações</p>';
                 html += '<h4 style="margin: 20px 0 15px 0;">⚙️ Configurações do Sistema</h4>';
                 html += '<p><strong>N8N Webhook:</strong> ' + stats.n8n_webhook_url + '</p>';
-                html += '<p><strong>Taxa de Conversão Global:</strong> ' + stats.revenue.conversionRate + '</p>';
                 html += '<p><strong>Horário:</strong> ' + stats.system.currentTime + '</p>';
                 html += '<p><strong>Iniciado em:</strong> ' + stats.system.startTime + '</p>';
                 html += '</div>';
@@ -2157,28 +1756,6 @@ function getHTMLContent() {
             if (currentTab === 'events') filterEvents();
         }
         
-        // Atualizar badges de features
-        function updateFeatureBadges() {
-            const container = document.getElementById('feature-badges');
-            if (!container || !currentData.status) return;
-            
-            let html = '';
-            const features = currentData.status.features_enabled;
-            
-            if (features) {
-                html += '<span class="feature-badge ' + (features.ENHANCED_LOCATION ? 'active' : 'inactive') + '"><i class="fas fa-map-marker-alt"></i> Localização Regional</span>';
-                html += '<span class="feature-badge ' + (features.VCARD_ENABLED ? 'active' : 'inactive') + '"><i class="fas fa-address-card"></i> vCard Auto</span>';
-                html += '<span class="feature-badge ' + (features.FACEBOOK_CAPI_ENABLED ? 'facebook' : 'inactive') + '"><i class="fab fa-facebook"></i> Facebook CAPI</span>';
-                html += '<span class="feature-badge ' + (features.ADVANCED_DASHBOARD ? 'active' : 'inactive') + '"><i class="fas fa-chart-line"></i> Dashboard Pro</span>';
-            }
-            
-            if (currentData.status.facebook_capi_configured) {
-                html += '<span class="feature-badge facebook"><i class="fas fa-check"></i> Pixel Configurado</span>';
-            }
-            
-            container.innerHTML = html;
-        }
-        
         // Atualizar dados
         async function refreshData() {
             try {
@@ -2189,24 +1766,10 @@ function getHTMLContent() {
                 document.getElementById('pending-pix').textContent = currentData.status.pending_pix_orders;
                 document.getElementById('active-conversations').textContent = currentData.status.active_conversations;
                 document.getElementById('sales-approved').textContent = currentData.status.delivery_reports.venda_aprovada;
-                
-                // Calcular taxa de conversão global
-                let totalConversions = 0;
-                let totalPix = 0;
-                if (currentData.status.instance_metrics) {
-                    currentData.status.instance_metrics.forEach(m => {
-                        totalConversions += m.conversions || 0;
-                        totalPix += m.pixGenerated || 0;
-                    });
-                }
-                const conversionRate = totalPix > 0 ? ((totalConversions / totalPix) * 100).toFixed(1) : 0;
-                document.getElementById('conversion-rate').textContent = conversionRate + '%';
+                document.getElementById('pix-timeout').textContent = currentData.status.delivery_reports.pix_timeout;
                 
                 // Atualizar URL do N8N
                 document.getElementById('n8n-url').textContent = currentData.status.n8n_webhook_url;
-                
-                // Atualizar badges de features
-                updateFeatureBadges();
                 
                 // Recarregar conteúdo da aba atual
                 loadTabContent();
@@ -2226,15 +1789,8 @@ function getHTMLContent() {
                     n8n_webhook_url: currentData.status ? currentData.status.n8n_webhook_url : 'N/A',
                     data_retention: '24 hours',
                     pix_timeout: '7 minutes',
-                    features: currentData.status ? currentData.status.features_enabled : {},
-                    funcionalidades: [
-                        'Localização por DDD com Saudações Regionais',
-                        'Sistema vCard Automático',
-                        'Facebook Conversions API',
-                        'Dashboard Avançado com Métricas por Instância',
-                        'Instâncias Fixas',
-                        'Anti-duplicata'
-                    ]
+                    localizacao: 'ATIVA - Baseada no CODE v2.7',
+                    funcionalidades: ['Localização por DDD', 'Instâncias Fixas', 'Anti-duplicata']
                 }
             };
             
@@ -2242,7 +1798,7 @@ function getHTMLContent() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'relatorio_cerebro_enhanced_' + new Date().toISOString().split('T')[0] + '.json';
+            a.download = 'relatorio_cerebro_' + new Date().toISOString().split('T')[0] + '.json';
             a.click();
         }
         
@@ -2270,10 +1826,7 @@ app.get('/health', (req, res) => {
         total_events: eventHistory.length,
         uptime: process.uptime(),
         features: {
-            localizacao: FEATURES.ENHANCED_LOCATION ? 'ATIVA com Saudações Regionais' : 'DESATIVADA',
-            vcard: FEATURES.VCARD_ENABLED ? 'ATIVA' : 'DESATIVADA',
-            facebook_capi: FEATURES.FACEBOOK_CAPI_ENABLED ? 'ATIVA' : 'DESATIVADA',
-            dashboard_avancado: FEATURES.ADVANCED_DASHBOARD ? 'ATIVA' : 'DESATIVADA',
+            localizacao: 'ATIVA - Baseada no CODE v2.7',
             instancias_fixas: 'ATIVA',
             anti_duplicata: 'ATIVA',
             timeout_pix: '7 minutos'
@@ -2281,15 +1834,14 @@ app.get('/health', (req, res) => {
         config: {
             n8n_webhook_url: N8N_WEBHOOK_URL,
             data_retention: '24 hours',
-            pix_timeout: '7 minutes',
-            facebook_configured: !!FACEBOOK_CONFIG.ACCESS_TOKEN
+            pix_timeout: '7 minutes'
         }
     });
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    addLog('info', `🧠 CÉREBRO DE ATENDIMENTO ENHANCED v4.0 iniciado na porta ${PORT}`);
+    addLog('info', `🧠 CÉREBRO DE ATENDIMENTO v3.0 COM LOCALIZAÇÃO (CODE v2.7) iniciado na porta ${PORT}`);
     addLog('info', `📡 Webhook Perfect: http://localhost:${PORT}/webhook/perfect`);
     addLog('info', `📱 Webhook Evolution: http://localhost:${PORT}/webhook/evolution`);
     addLog('info', `🖥️ Painel de Controle: http://localhost:${PORT}`);
@@ -2297,21 +1849,25 @@ app.listen(PORT, () => {
     addLog('info', `📈 API Estatísticas: http://localhost:${PORT}/stats`);
     addLog('info', `🎯 N8N Webhook: ${N8N_WEBHOOK_URL}`);
     addLog('info', `🤖 Evolution API: ${EVOLUTION_API_URL}`);
+    addLog('info', `🗺️ Sistema de Localização: ATIVO (Baseado no CODE v2.7)`);
+    addLog('info', `📍 DDDs Mapeados: ${Object.keys(getLocationByDDD('5511999999999') !== null ? {
+        '11': 'São Paulo', '21': 'Rio de Janeiro', '31': 'Belo Horizonte',
+        '41': 'Curitiba', '51': 'Porto Alegre', '61': 'Brasília',
+        '71': 'Salvador', '81': 'Recife', '85': 'Fortaleza', '91': 'Belém'
+    } : {}).length}+ DDDs brasileiros`);
+    addLog('info', `⏰ Timezone: America/Sao_Paulo (Horário de Brasília)`);
+    addLog('info', `🗑️ Retenção de dados: 24 horas`);
+    addLog('info', `⏱️ Timeout PIX: 7 minutos`);
     
-    // Log das funcionalidades ativas
-    console.log(`\n🧠 CÉREBRO DE ATENDIMENTO ENHANCED v4.0 ATIVO`);
-    console.log(`================================================================================`);
-    console.log(`🎯 FUNCIONALIDADES IMPLEMENTADAS:`);
-    console.log(`   ✅ Localização por DDD: ${FEATURES.ENHANCED_LOCATION ? 'ATIVA com Saudações Regionais' : 'DESATIVADA'}`);
-    console.log(`   ✅ Sistema vCard: ${FEATURES.VCARD_ENABLED ? 'ATIVO' : 'DESATIVADO'}`);
-    console.log(`   ✅ Facebook CAPI: ${FEATURES.FACEBOOK_CAPI_ENABLED ? 'ATIVO' : 'DESATIVADO'}`);
-    console.log(`   ✅ Dashboard Avançado: ${FEATURES.ADVANCED_DASHBOARD ? 'ATIVO' : 'DESATIVADO'}`);
+    console.log(`\n🧠 CÉREBRO DE ATENDIMENTO v3.0 COM LOCALIZAÇÃO BASEADA NO CODE v2.7 ATIVO`);
     console.log(`================================================================================`);
     console.log(`📡 Webhooks configurados:`);
     console.log(`   Perfect Pay: http://localhost:${PORT}/webhook/perfect`);
     console.log(`   Evolution: http://localhost:${PORT}/webhook/evolution`);
     console.log(`🎯 N8N: ${N8N_WEBHOOK_URL}`);
     console.log(`📊 Painel: http://localhost:${PORT}`);
+    console.log(`🗺️ LOCALIZAÇÃO: ATIVA com função exata do CODE v2.7`);
+    console.log(`📍 MAPEAMENTO: Todos os DDDs brasileiros incluídos`);
     console.log(`⏰ Horário: ${getBrazilTime()}`);
     console.log(`================================================================================\n`);
 });
