@@ -19,7 +19,7 @@ const FEATURES = {
 
 // Configurações Facebook CAPI (preencher com seus dados)
 const FACEBOOK_CONFIG = {
-    ACCESS_TOKEN: process.env.FB_ACCESS_TOKEN || '', // Adicionar no ambiente
+    ACCESS_TOKEN: process.env.FB_ACCESS_TOKEN || 'EAAIbZCP5fkVYBPbP06QWO6OkZAtGo9p6ax37l6CMBvEkCjyc7TwSCKZArHhD7dDPj8ZBuy4R5s7KnguHoH3Qf3Iq0MQChZAWokYZBbKDlcPOdWah9oUQMdhRMAkZCAK79N9qiHab8j5fOjHHKO3Tn1c8m6b05zpXU4dqd0uZBHcaNnObkCkiK2vrVQasva1ccU0jNAZDZD', // Adicionar no ambiente
     PIXEL_ID: process.env.FB_PIXEL_ID || '', // Adicionar no ambiente
     TEST_EVENT_CODE: process.env.FB_TEST_CODE || '' // Para testes, deixar vazio em produção
 };
