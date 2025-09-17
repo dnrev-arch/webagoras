@@ -345,7 +345,7 @@ app.post('/webhook/kirvano', async (req, res) => {
             
             // Enviar para N8N - FORMATO PADRONIZADO
             const eventData = {
-                event_type: 'aprovada',
+                evento: 'venda_aprovada',
                 produto: productType,
                 instancia: instance,
                 evento_origem: 'aprovada',
@@ -381,7 +381,7 @@ app.post('/webhook/kirvano', async (req, res) => {
                 instance: instance,
                 original_event: 'pix',
                 response_count: 0,
-                waiting_for_response: false, // COMEÇA FALSE
+                waiting_for_response: true, // DEVE COMEÇAR TRUE
                 client_name: customerName,
                 amount: totalPrice,
                 pix_url: data.payment?.qrcode_image || data.payment?.qrcode || '',
@@ -400,7 +400,7 @@ app.post('/webhook/kirvano', async (req, res) => {
                     
                     // Enviar evento pix_timeout para N8N - FORMATO PADRONIZADO
                     const eventData = {
-                        event_type: 'pix',
+                        evento: 'pix_timeout',
                         produto: productType,
                         instancia: instance,
                         evento_origem: 'pix',
@@ -506,7 +506,7 @@ app.post('/webhook/evolution', async (req, res) => {
                 
                 // Enviar resposta_01 para N8N - FORMATO PADRONIZADO
                 const eventData = {
-                    event_type: 'resposta',
+                    evento: 'resposta_01',
                     produto: clientState.product,
                     instancia: clientState.instance,
                     evento_origem: clientState.original_event, // 'pix' ou 'aprovada'
