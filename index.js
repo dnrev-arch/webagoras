@@ -5,7 +5,7 @@ const app = express();
 // ============ CONFIGURAÇÕES PERSONALIZADAS DANILO ============
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8n.flowzap.fun/webhook/kirvano-pag';
 const EVOLUTION_BASE_URL = process.env.EVOLUTION_BASE_URL || 'https://evo.flowzap.fun';
-const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || 'SUA_API_KEY_AQUI';
+const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || 'https://danilo-danilo-atendimento-n8n.jq3pgw.easypanel.host/webhook/evolution';
 const PIX_TIMEOUT = 7 * 60 * 1000; // 7 minutos (conforme solicitado)
 const CLEANUP_INTERVAL = 10 * 60 * 1000; // 10 minutos
 const DATA_RETENTION = 24 * 60 * 60 * 1000; // 24 horas
