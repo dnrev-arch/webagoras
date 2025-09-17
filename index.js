@@ -208,7 +208,8 @@ function updateEventStatus(eventId, status, error = null) {
 // Enviar para N8N
 async function sendToN8N(eventData, eventId = null) {
     try {
-        console.log(`📤 Enviando para N8N: ${eventData.event_type}`);
+        console.log(`📤 Enviando para N8N: ${eventData.evento}`);
+        console.log(`📤 Dados completos:`, JSON.stringify(eventData, null, 2));
         const response = await axios.post(N8N_WEBHOOK_URL, eventData, {
             headers: { 'Content-Type': 'application/json' },
             timeout: 15000
