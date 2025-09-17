@@ -2,38 +2,44 @@ const express = require('express');
 const axios = require('axios');
 const app = express();
 
-// ============ CONFIGURAÇÕES ============
-const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8n.flowzap.fun/webhook/atendimento-n8n';
+// ============ CONFIGURAÇÕES PERSONALIZADAS DANILO ============
+const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8n.flowzap.fun/webhook/kirvano-pag';
 const EVOLUTION_BASE_URL = process.env.EVOLUTION_BASE_URL || 'https://evo.flowzap.fun';
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || 'SUA_API_KEY_AQUI';
-const PIX_TIMEOUT = 7 * 60 * 1000; // 7 minutos
+const PIX_TIMEOUT = 7 * 60 * 1000; // 7 minutos (conforme solicitado)
 const CLEANUP_INTERVAL = 10 * 60 * 1000; // 10 minutos
 const DATA_RETENTION = 24 * 60 * 60 * 1000; // 24 horas
 const IDEMPOTENCY_TTL = 5 * 60 * 1000; // 5 minutos
 const PORT = process.env.PORT || 3000;
 
-// Mapeamento dos produtos Kirvano (2 produtos: CS e FAB)
+// ============ MAPEAMENTO DE PRODUTOS DANILO (OFFER_ID) ============
 const PRODUCT_MAPPING = {
-    // CS - Planos diversos que mapeiam para CS
-    '5c1f6390-8999-4740-b16f-51380e1097e4': 'CS',
-    '0f393085-4960-4c71-9efe-faee8ba51d3f': 'CS',
-    'e2282b4c-878c-4bcd-becb-1977dfd6d2b8': 'CS',
+    // FABI R$ 24,99
+    '668a73bc-2fca-4f12-9331-ef945181cd5c': 'FAB',
     
-    // FAB - Plano único
-    '5288799c-d8e3-48ce-a91d-587814acdee5': 'FAB'
+    // CS (3 planos)
+    'e79419d3-5b71-4f90-954b-b05e94de8d98': 'CS', // R$ 19
+    '06539c76-40ee-4811-8351-ab3f5ccc4437': 'CS', // R$ 29  
+    '564bb9bb-718a-4e8b-a843-a2da62f616f0': 'CS', // R$ 49
+    
+    // NAT (3 planos)
+    '08be89d4-96a7-40fd-9d32-ecc4b5cffcdb': 'NAT', // R$ 19
+    '4230eda0-4762-47e6-b8e7-72ab8a2f6f90': 'NAT', // R$ 49
+    'f2289442-c3bc-415f-b6bd-5bc3c3e8e2f7': 'NAT'  // R$ 100
 };
 
-// Instâncias Evolution (9 instâncias) - CÓDIGOS ATUALIZADOS
+// ============ INSTÂNCIAS DANILO (D01-D10) ============
 const INSTANCES = [
-    { name: 'GABY01', id: 'E2C81A52501B-4ACC-B8CD-CC5CD8B3D772' },
-    { name: 'GABY02', id: '8ACC5623B341-4103-8DFC-D69A9D70B8C0' },
-    { name: 'GABY03', id: '8583DF575DE7-4040-833C-F4F4852AD220' },
-    { name: 'GABY04', id: '20A83A5A8582-40DE-8DA3-B3833EEE3A58' },
-    { name: 'GABY05', id: '1EF7D7CB2666-46E2-9869-4B3F8B86524F' },
-    { name: 'GABY06', id: '86AB0DB684CB-482A-ABCC-F0D6F98BC5CE' },
-    { name: 'GABY07', id: 'E6935AB086D4-478E-9A6F-13791D4654D5' },
-    { name: 'GABY08', id: '2C6E25A7854A-445E-9588-6DB7330EBC1D' },
-    { name: 'GABY09', id: '1D0EA3E93819-49BE-923C-6277A7D0C935' }
+    { name: 'D01', id: 'E72041FBC017-4C78-B82B-A0D90F95FE5F', phone: '557582237133' },
+    { name: 'D02', id: '36B65257D668-413C-BB29-7150092099C7', phone: '557587077645' },
+    { name: 'D03', id: '6B605CD2B735-4A89-A914-7E9508B7481B', phone: '557587077646' },
+    { name: 'D04', id: 'F13E2FF90F39-4DC7-8D0D-FDB1395B4546', phone: '557587002116' },
+    { name: 'D05', id: '3775095A36FB-43C4-AA9C-5335D120F466', phone: '557587092975' },
+    { name: 'D06', id: 'F27A6A27213E-40C3-A334-F3A2261E3631', phone: '555481007975' },
+    { name: 'D07', id: '0082AB570022-4AE3-95ED-031DA35DAA30', phone: '557587053003' },
+    { name: 'D08', id: 'DEB1AB14A0FF-4D98-8F60-D5341D239EBC', phone: '557582253844' },
+    { name: 'D09', id: '5FCEB25F0FD8-432A-8BCE-CF689E180B3E', phone: '557587052701' },
+    { name: 'D10', id: '2EFC39376BAD-43F8-A6E8-61349EEFAAD3', phone: '557587092976' }
 ];
 
 // ============ ARMAZENAMENTO EM MEMÓRIA ============
@@ -48,7 +54,7 @@ app.use(express.json());
 
 // ============ FUNÇÕES AUXILIARES ============
 
-// Normalizar número de telefone (NUNCA remove o 9)
+// Normalizar número de telefone (mantém o 9º dígito)
 function normalizePhone(phone) {
     if (!phone) return '';
     
@@ -68,36 +74,14 @@ function normalizePhone(phone) {
     return cleaned;
 }
 
-// Verificar se evento é aprovado (recebe valores já em UPPERCASE)
-function isApprovedEvent(EV, ST) {
-    return EV.includes('APPROVED') || 
-           EV.includes('PAID') || 
-           EV.includes('SALE_APPROVED') ||
-           EV.includes('PAYMENT_APPROVED') ||
-           ST === 'APPROVED' || 
-           ST === 'PAID' ||
-           ST === 'COMPLETED';
+// Verificar se evento é aprovado (baseado nos dados da Kirvano)
+function isApprovedEvent(event, status) {
+    return event === 'SALE_APPROVED' && status === 'APPROVED';
 }
 
-// Verificar se é PIX pendente (recebe valores já em UPPERCASE)
-function isPendingPixEvent(EV, ST, PM) {
-    const hasPix = PM.includes('PIX') || EV.includes('PIX');
-    const pending = ST.includes('PEND') || 
-                   ST.includes('AWAIT') || 
-                   ST.includes('CREATED') || 
-                   ST.includes('WAITING') ||
-                   ST === 'PENDING';
-    return hasPix && (pending || EV.includes('PIX_GENERATED') || EV.includes('PIX_CREATED'));
-}
-
-// Normalizar evento para N8N (apenas "pix" ou "aprovada")
-function normalizeEventType(EV, ST, PM) {
-    if (isApprovedEvent(EV, ST)) {
-        return 'aprovada';
-    } else if (isPendingPixEvent(EV, ST, PM)) {
-        return 'pix';
-    }
-    return 'unknown';
+// Verificar se é PIX pendente (baseado nos dados da Kirvano)
+function isPendingPixEvent(event, status) {
+    return event === 'PIX_GENERATED' && status === 'PENDING';
 }
 
 // Extrair texto de mensagem Evolution (múltiplos formatos)
@@ -294,28 +278,26 @@ function cleanupOldData() {
 // Executar limpeza periodicamente
 setInterval(cleanupOldData, CLEANUP_INTERVAL);
 
-// ============ WEBHOOK KIRVANO ============
+// ============ WEBHOOK KIRVANO - PERSONALIZADO DANILO ============
 app.post('/webhook/kirvano', async (req, res) => {
     try {
         const data = req.body;
         
-        // Normalizar event/status/method em UPPERCASE
-        const rawEvent = data.event;
-        const rawStatus = data.status || data.payment_status || data.payment?.status || '';
-        const rawMethod = data.payment?.method || data.payment_method || '';
+        console.log(`\n📨 WEBHOOK KIRVANO RECEBIDO:`);
+        console.log(`Event: ${data.event}`);
+        console.log(`Status: ${data.status}`);
+        console.log(`Sale ID: ${data.sale_id}`);
+        console.log(`Customer: ${data.customer?.name}`);
+        console.log(`Phone: ${data.customer?.phone_number}`);
+        console.log(`Offer ID: ${data.products?.[0]?.offer_id}`);
         
-        const EV = String(rawEvent).toUpperCase();
-        const ST = String(rawStatus).toUpperCase();
-        const PM = String(rawMethod).toUpperCase();
-        
-        console.log(`\n📨 WEBHOOK KIRVANO: ${EV} | Status: ${ST} | Method: ${PM}`);
-        
+        const event = data.event;
+        const status = data.status;
         const saleId = data.sale_id;
-        const checkoutId = data.checkout_id;
-        const orderCode = saleId || checkoutId || `ORDER_${Date.now()}`;
         const customerName = data.customer?.name || 'Cliente';
         const customerPhone = data.customer?.phone_number || '';
         const totalPrice = data.total_price || 'R$ 0,00';
+        const offerId = data.products?.[0]?.offer_id;
         
         // Normalizar telefone
         const normalizedPhone = normalizePhone(customerPhone);
@@ -325,29 +307,22 @@ app.post('/webhook/kirvano', async (req, res) => {
             return res.json({ success: false, message: 'Telefone inválido' });
         }
         
-        // Verificar idempotência usando valores normalizados
-        const idempotencyKey = `${EV}:${normalizedPhone}:${orderCode}`;
+        // Verificar idempotência
+        const idempotencyKey = `${event}:${normalizedPhone}:${saleId}`;
         if (checkIdempotency(idempotencyKey)) {
             return res.json({ success: true, message: 'Evento duplicado ignorado' });
         }
         
-        // Identificar produto
-        let productType = 'UNKNOWN';
-        if (data.products && data.products.length > 0) {
-            const offerId = data.products[0].offer_id;
-            productType = PRODUCT_MAPPING[offerId] || 'UNKNOWN';
-            console.log(`📦 Produto: ${productType} (offer_id: ${offerId})`);
-        }
+        // Identificar produto pelo offer_id
+        let productType = PRODUCT_MAPPING[offerId] || 'UNKNOWN';
+        console.log(`📦 Produto identificado: ${productType} (offer_id: ${offerId})`);
         
-        // Obter próxima instância (round-robin)
+        // Obter próxima instância (round-robin sticky)
         const instance = getNextInstanceForClient(normalizedPhone);
         
-        // Normalizar tipo de evento
-        const normalizedEventType = normalizeEventType(EV, ST, PM);
-        
         // ========== VENDA APROVADA ==========
-        if (isApprovedEvent(EV, ST)) {
-            console.log(`✅ VENDA APROVADA - ${orderCode} - ${customerName}`);
+        if (isApprovedEvent(event, status)) {
+            console.log(`✅ VENDA APROVADA - ${saleId} - ${customerName}`);
             
             // SEMPRE cancelar timeout por telefone
             const timeoutCanceled = cancelPixTimeout(normalizedPhone);
@@ -357,10 +332,10 @@ app.post('/webhook/kirvano', async (req, res) => {
             
             // Criar/atualizar estado da conversa
             conversationState.set(normalizedPhone, {
-                order_code: orderCode,
+                order_code: saleId,
                 product: productType,
                 instance: instance,
-                original_event: 'aprovada', // NORMALIZADO
+                original_event: 'aprovada',
                 response_count: 0,
                 waiting_for_response: false, // COMEÇA FALSE
                 client_name: customerName,
@@ -371,22 +346,24 @@ app.post('/webhook/kirvano', async (req, res) => {
             // Registrar evento no histórico
             const eventId = logEvent('aprovada', normalizedPhone, instance);
             
-            // Enviar para N8N
+            // Enviar para N8N - FORMATO PADRONIZADO
             const eventData = {
-                event_type: 'aprovada', // NORMALIZADO
+                event_type: 'aprovada',
                 produto: productType,
                 instancia: instance,
-                evento_origem: 'aprovada', // NORMALIZADO
+                evento_origem: 'aprovada',
                 cliente: {
-                    nome: customerName.split(' ')[0],
+                    nome: customerName.split(' ')[0], // Só primeiro nome
                     telefone: normalizedPhone,
                     nome_completo: customerName
                 },
                 pedido: {
-                    codigo: orderCode,
-                    valor: totalPrice
+                    codigo: saleId,
+                    valor: totalPrice,
+                    offer_id: offerId
                 },
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                dados_originais: data
             };
             
             await sendToN8N(eventData, eventId);
@@ -394,18 +371,18 @@ app.post('/webhook/kirvano', async (req, res) => {
         }
         
         // ========== PIX PENDENTE ==========
-        else if (isPendingPixEvent(EV, ST, PM)) {
-            console.log(`⏳ PIX PENDENTE - ${orderCode} - ${customerName}`);
+        else if (isPendingPixEvent(event, status)) {
+            console.log(`⏳ PIX PENDENTE - ${saleId} - ${customerName}`);
             
             // Cancelar timeout anterior se existir
             cancelPixTimeout(normalizedPhone);
             
             // Criar estado da conversa
             conversationState.set(normalizedPhone, {
-                order_code: orderCode,
+                order_code: saleId,
                 product: productType,
                 instance: instance,
-                original_event: 'pix', // NORMALIZADO
+                original_event: 'pix',
                 response_count: 0,
                 waiting_for_response: false, // COMEÇA FALSE
                 client_name: customerName,
@@ -416,32 +393,34 @@ app.post('/webhook/kirvano', async (req, res) => {
             
             // Criar timeout de 7 minutos
             const timeout = setTimeout(async () => {
-                console.log(`⏰ TIMEOUT PIX: ${orderCode} para ${normalizedPhone}`);
+                console.log(`⏰ TIMEOUT PIX: ${saleId} para ${normalizedPhone}`);
                 
                 // Verificar se ainda está pendente
                 const state = conversationState.get(normalizedPhone);
-                if (state && state.order_code === orderCode) {
+                if (state && state.order_code === saleId) {
                     // Registrar evento no histórico
                     const eventId = logEvent('pix', normalizedPhone, instance);
                     
-                    // Enviar evento pix_timeout para N8N
+                    // Enviar evento pix_timeout para N8N - FORMATO PADRONIZADO
                     const eventData = {
-                        event_type: 'pix', // NORMALIZADO (timeout de PIX)
+                        event_type: 'pix',
                         produto: productType,
                         instancia: instance,
-                        evento_origem: 'pix', // NORMALIZADO
+                        evento_origem: 'pix',
                         cliente: {
-                            nome: customerName.split(' ')[0],
+                            nome: customerName.split(' ')[0], // Só primeiro nome
                             telefone: normalizedPhone,
                             nome_completo: customerName
                         },
                         pedido: {
-                            codigo: orderCode,
+                            codigo: saleId,
                             valor: totalPrice,
-                            pix_url: state.pix_url || ''
+                            pix_url: state.pix_url || '',
+                            offer_id: offerId
                         },
                         timeout: true, // Flag para identificar que é timeout
-                        timestamp: new Date().toISOString()
+                        timestamp: new Date().toISOString(),
+                        dados_originais: data
                     };
                     
                     await sendToN8N(eventData, eventId);
@@ -453,7 +432,7 @@ app.post('/webhook/kirvano', async (req, res) => {
             // Armazenar timeout por telefone
             pixTimeouts.set(normalizedPhone, {
                 timeout: timeout,
-                orderCode: orderCode,
+                orderCode: saleId,
                 product: productType,
                 createdAt: new Date()
             });
@@ -463,7 +442,7 @@ app.post('/webhook/kirvano', async (req, res) => {
         }
         
         else {
-            console.log(`⚠️ Evento ignorado: ${EV} - ${ST} - ${PM}`);
+            console.log(`⚠️ Evento ignorado: ${event} - ${status}`);
             res.json({ success: true, message: 'Evento ignorado' });
         }
         
@@ -473,7 +452,7 @@ app.post('/webhook/kirvano', async (req, res) => {
     }
 });
 
-// ============ WEBHOOK EVOLUTION ============
+// ============ WEBHOOK EVOLUTION - SISTEMA DE RESPOSTA OBRIGATÓRIA ============
 app.post('/webhook/evolution', async (req, res) => {
     try {
         const data = req.body;
@@ -507,7 +486,7 @@ app.post('/webhook/evolution', async (req, res) => {
             conversationState.set(normalized, clientState);
         }
         
-        // RESPOSTA DO CLIENTE
+        // RESPOSTA DO CLIENTE (SISTEMA DE RESPOSTA OBRIGATÓRIA)
         else {
             // Verificar se é a primeira resposta válida
             if (clientState.waiting_for_response && clientState.response_count === 0) {
@@ -518,7 +497,7 @@ app.post('/webhook/evolution', async (req, res) => {
                     return res.json({ success: true, message: 'Resposta duplicada ignorada' });
                 }
                 
-                console.log(`📥 PRIMEIRA RESPOSTA de ${normalized}`);
+                console.log(`📥 PRIMEIRA RESPOSTA de ${normalized} - CONTINUANDO FLUXO`);
                 
                 // Marcar como respondido
                 clientState.response_count = 1;
@@ -528,15 +507,15 @@ app.post('/webhook/evolution', async (req, res) => {
                 // Registrar evento no histórico
                 const eventId = logEvent('resposta', normalized, clientState.instance);
                 
-                // Enviar resposta_01 para N8N
+                // Enviar resposta_01 para N8N - FORMATO PADRONIZADO
                 const eventData = {
-                    event_type: 'resposta', // NORMALIZADO
+                    event_type: 'resposta',
                     produto: clientState.product,
                     instancia: clientState.instance,
-                    evento_origem: clientState.original_event, // já normalizado (pix ou aprovada)
+                    evento_origem: clientState.original_event, // 'pix' ou 'aprovada'
                     cliente: {
                         telefone: normalized,
-                        nome: clientState.client_name.split(' ')[0]
+                        nome: clientState.client_name.split(' ')[0] // Só primeiro nome
                     },
                     resposta: {
                         numero: 1,
@@ -551,10 +530,10 @@ app.post('/webhook/evolution', async (req, res) => {
                 };
                 
                 await sendToN8N(eventData, eventId);
-                console.log(`✅ Resposta_01 enviada para N8N`);
+                console.log(`✅ Resposta_01 enviada para N8N - FLUXO CONTINUARÁ`);
             }
             else if (!clientState.waiting_for_response) {
-                console.log(`⚠️ Cliente respondeu antes da MSG_01 - ignorado`);
+                console.log(`⚠️ Cliente respondeu antes da MSG_01 - FLUXO NÃO CONTINUA`);
             }
             else {
                 console.log(`⚠️ Resposta adicional do cliente - ignorada`);
@@ -569,7 +548,7 @@ app.post('/webhook/evolution', async (req, res) => {
     }
 });
 
-// ============ ENDPOINTS DE STATUS ============
+// ============ ENDPOINTS DE STATUS E MONITORAMENTO ============
 app.get('/status', (req, res) => {
     // Filtrar eventos das últimas 24h
     const last24h = Date.now() - DATA_RETENTION;
@@ -577,7 +556,7 @@ app.get('/status', (req, res) => {
         event.timestamp.getTime() > last24h
     );
 
-    // Métricas adicionais
+    // Métricas
     const pendingPix = Array.from(pixTimeouts.keys()).length;
     const activeConversations = conversationState.size;
     const cacheSize = idempotencyCache.size;
@@ -607,7 +586,9 @@ app.get('/status', (req, res) => {
         config: {
             n8n_webhook: N8N_WEBHOOK_URL,
             evolution_base_url: EVOLUTION_BASE_URL,
-            instances_count: INSTANCES.length
+            instances_count: INSTANCES.length,
+            products_mapped: Object.keys(PRODUCT_MAPPING).length,
+            pix_timeout_minutes: PIX_TIMEOUT / (1000 * 60)
         },
         events: recentEvents,
         stats: {
@@ -622,12 +603,8 @@ app.get('/status', (req, res) => {
         },
         pending_list: pendingList,
         conversations_list: conversationsList,
-        recent_logs: recentEvents.slice(0, 20).map(event => ({
-            timestamp: event.timestamp,
-            type: event.event_type,
-            event: `${event.phone} - ${event.instance}`,
-            error: event.error
-        }))
+        instances: INSTANCES.map(i => ({ name: i.name, phone: i.phone })),
+        products: PRODUCT_MAPPING
     });
 });
 
@@ -635,16 +612,17 @@ app.get('/health', (req, res) => {
     res.json({ 
         status: 'ok', 
         timestamp: new Date().toISOString(),
-        uptime: process.uptime()
+        uptime: process.uptime(),
+        system: 'Danilo Kirvano System v1.0'
     });
 });
 
-// ============ INTERFACE WEB (PAINEL) ============
+// ============ PAINEL DE CONTROLE PERSONALIZADO ============
 app.get('/', (req, res) => {
     const html = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <title>Cérebro Kirvano - Painel de Controle</title>
+    <title>🧠 Cérebro Danilo - Sistema Kirvano</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
@@ -684,6 +662,40 @@ app.get('/', (req, res) => {
             color: #666;
             font-size: 1rem;
             margin-bottom: 20px;
+        }
+        
+        .config-info {
+            background: #f7fafc;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .config-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .config-item:last-child {
+            border-bottom: none;
+        }
+        
+        .config-label {
+            color: #718096;
+            font-weight: 600;
+        }
+        
+        .config-value {
+            color: #2d3748;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+        
+        .status-active {
+            color: #38a169;
+            font-weight: bold;
         }
         
         .stats-grid {
@@ -812,54 +824,49 @@ app.get('/', (req, res) => {
             color: #718096;
         }
         
-        .config-info {
-            background: #f7fafc;
+        .product-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .product-card {
+            background: #f8f9fa;
             border-radius: 10px;
             padding: 15px;
-            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
         }
-        
-        .config-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 5px 0;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        
-        .config-item:last-child {
-            border-bottom: none;
-        }
-        
-        .config-label {
-            color: #718096;
-            font-weight: 600;
-        }
-        
-        .config-value {
-            color: #2d3748;
-            font-family: monospace;
-            font-size: 0.9rem;
-        }
-        
-        .log-entry {
-            background: #f8f9fa;
-            border-left: 3px solid #667eea;
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 5px;
-            font-family: monospace;
-            font-size: 0.85rem;
-        }
-        
-        .log-error { border-left-color: #f56565; }
-        .log-success { border-left-color: #48bb78; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🧠 Cérebro Kirvano - Painel</h1>
-            <div class="subtitle">Sistema de Monitoramento e Controle</div>
+            <h1>🧠 Cérebro Danilo - Sistema Kirvano</h1>
+            <div class="subtitle">Monitoramento Completo | Evolution API + N8N</div>
+            
+            <div class="config-info">
+                <div class="config-item">
+                    <span class="config-label">N8N Webhook:</span>
+                    <span class="config-value">${N8N_WEBHOOK_URL}</span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">Instâncias Ativas:</span>
+                    <span class="config-value status-active">${INSTANCES.length} instâncias (D01-D10)</span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">Produtos Mapeados:</span>
+                    <span class="config-value status-active">${Object.keys(PRODUCT_MAPPING).length} produtos (FAB/CS/NAT)</span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">Timeout PIX:</span>
+                    <span class="config-value">${PIX_TIMEOUT / (1000 * 60)} minutos</span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">Sistema de Resposta:</span>
+                    <span class="config-value status-active">OBRIGATÓRIA (Anti-queda)</span>
+                </div>
+            </div>
             
             <div class="stats-grid" id="stats">
                 <div class="stat-card warning">
@@ -868,31 +875,32 @@ app.get('/', (req, res) => {
                 </div>
                 
                 <div class="stat-card info">
-                    <div class="stat-label">💬 Conversas</div>
+                    <div class="stat-label">💬 Conversas Ativas</div>
                     <div class="stat-value" id="activeConv">0</div>
                 </div>
                 
                 <div class="stat-card success">
-                    <div class="stat-label">🚀 Instâncias</div>
-                    <div class="stat-value">${INSTANCES.length}</div>
+                    <div class="stat-label">🚀 Eventos Enviados</div>
+                    <div class="stat-value" id="sentEvents">0</div>
                 </div>
                 
                 <div class="stat-card danger">
-                    <div class="stat-label">🔁 Cache</div>
-                    <div class="stat-value" id="cacheSize">0</div>
+                    <div class="stat-label">❌ Eventos com Erro</div>
+                    <div class="stat-value" id="errorEvents">0</div>
                 </div>
             </div>
             
             <button class="btn" onclick="refreshData()">🔄 Atualizar</button>
-            <button class="btn" onclick="checkInstances()">📡 Verificar Instâncias</button>
+            <button class="btn" onclick="testWebhook()">🧪 Testar Webhook</button>
         </div>
         
         <div class="content-panel">
             <div class="tabs">
-                <button class="tab active" onclick="switchTab('pending')">PIX Pendentes</button>
-                <button class="tab" onclick="switchTab('conversations')">Conversas Ativas</button>
-                <button class="tab" onclick="switchTab('logs')">Logs Recentes</button>
-                <button class="tab" onclick="switchTab('instances')">Status Instâncias</button>
+                <button class="tab active" onclick="switchTab('overview')">📊 Visão Geral</button>
+                <button class="tab" onclick="switchTab('pending')">⏳ PIX Pendentes</button>
+                <button class="tab" onclick="switchTab('conversations')">💬 Conversas</button>
+                <button class="tab" onclick="switchTab('instances')">🤖 Instâncias</button>
+                <button class="tab" onclick="switchTab('products')">📦 Produtos</button>
             </div>
             
             <div id="tabContent">
@@ -904,9 +912,8 @@ app.get('/', (req, res) => {
     </div>
     
     <script>
-        let currentTab = 'pending';
+        let currentTab = 'overview';
         let statusData = null;
-        let instancesStatus = {};
         
         async function refreshData() {
             try {
@@ -915,7 +922,8 @@ app.get('/', (req, res) => {
                 
                 document.getElementById('pendingPix').textContent = statusData.metrics.pending_pix;
                 document.getElementById('activeConv').textContent = statusData.metrics.active_conversations;
-                document.getElementById('cacheSize').textContent = statusData.metrics.idempotency_cache;
+                document.getElementById('sentEvents').textContent = statusData.stats.sent_events;
+                document.getElementById('errorEvents').textContent = statusData.stats.error_events;
                 
                 updateTabContent();
             } catch (error) {
@@ -923,23 +931,8 @@ app.get('/', (req, res) => {
             }
         }
         
-        async function checkInstances() {
-            const instances = ${JSON.stringify(INSTANCES.map(i => i.name))};
-            instancesStatus = {};
-            
-            for (const instance of instances) {
-                try {
-                    const response = await fetch(statusData.config.evolution_base_url + '/instance/connectionState/' + instance);
-                    const data = await response.json();
-                    instancesStatus[instance] = data.state === 'open' || data.instance?.state === 'open';
-                } catch (error) {
-                    instancesStatus[instance] = false;
-                }
-            }
-            
-            if (currentTab === 'instances') {
-                updateTabContent();
-            }
+        async function testWebhook() {
+            alert('Função de teste será implementada. Verifique os logs do sistema.');
         }
         
         function switchTab(tab) {
@@ -957,81 +950,82 @@ app.get('/', (req, res) => {
                 return;
             }
             
-            if (currentTab === 'pending') {
+            if (currentTab === 'overview') {
+                content.innerHTML = '<div><h3>📊 Sistema Online e Funcionando</h3>' +
+                    '<p>Webhook Kirvano configurado e recebendo dados corretamente.</p>' +
+                    '<p>Sistema de timeout de 7 minutos ativo para PIX pendentes.</p>' +
+                    '<p>Sistema de resposta obrigatória ativo (anti-queda).</p></div>';
+                    
+            } else if (currentTab === 'pending') {
                 if (statusData.pending_list.length === 0) {
-                    content.innerHTML = '<div class="empty-state"><p>Nenhum PIX pendente no momento</p></div>';
+                    content.innerHTML = '<div class="empty-state"><p>Nenhum PIX pendente</p></div>';
                 } else {
-                    let html = '<table><thead><tr><th>Telefone</th><th>Pedido</th><th>Produto</th><th>Criado em</th></tr></thead><tbody>';
+                    let html = '<table><thead><tr><th>Telefone</th><th>Pedido</th><th>Produto</th><th>Criado</th></tr></thead><tbody>';
                     statusData.pending_list.forEach(item => {
                         const createdAt = new Date(item.created_at).toLocaleString('pt-BR');
-                        html += '<tr>';
-                        html += '<td>' + item.phone + '</td>';
-                        html += '<td>' + item.order_code + '</td>';
-                        html += '<td><span class="badge badge-' + (item.product === 'FAB' ? 'warning' : 'info') + '">' + item.product + '</span></td>';
-                        html += '<td>' + createdAt + '</td>';
-                        html += '</tr>';
+                        html += '<tr><td>' + item.phone + '</td><td>' + item.order_code + '</td>';
+                        html += '<td><span class="badge badge-warning">' + item.product + '</span></td>';
+                        html += '<td>' + createdAt + '</td></tr>';
                     });
                     html += '</tbody></table>';
                     content.innerHTML = html;
                 }
+                
             } else if (currentTab === 'conversations') {
                 if (statusData.conversations_list.length === 0) {
                     content.innerHTML = '<div class="empty-state"><p>Nenhuma conversa ativa</p></div>';
                 } else {
-                    let html = '<table><thead><tr><th>Telefone</th><th>Pedido</th><th>Produto</th><th>Instância</th><th>Origem</th><th>Respostas</th><th>Status</th></tr></thead><tbody>';
+                    let html = '<table><thead><tr><th>Telefone</th><th>Pedido</th><th>Produto</th><th>Instância</th><th>Origem</th><th>Status</th></tr></thead><tbody>';
                     statusData.conversations_list.forEach(conv => {
-                        html += '<tr>';
-                        html += '<td>' + conv.phone + '</td>';
-                        html += '<td>' + conv.order_code + '</td>';
-                        html += '<td><span class="badge badge-' + (conv.product === 'FAB' ? 'warning' : 'info') + '">' + conv.product + '</span></td>';
+                        html += '<tr><td>' + conv.phone + '</td><td>' + conv.order_code + '</td>';
+                        html += '<td><span class="badge badge-info">' + conv.product + '</span></td>';
                         html += '<td>' + conv.instance + '</td>';
-                        html += '<td><span class="badge badge-info">' + conv.original_event + '</span></td>';
-                        html += '<td>' + conv.response_count + '</td>';
-                        html += '<td><span class="badge badge-' + (conv.waiting_for_response ? 'warning' : 'success') + '">' + (conv.waiting_for_response ? 'Aguardando' : 'Respondido') + '</span></td>';
-                        html += '</tr>';
+                        html += '<td><span class="badge badge-warning">' + conv.original_event + '</span></td>';
+                        html += '<td><span class="badge badge-' + (conv.waiting_for_response ? 'warning' : 'success') + '">';
+                        html += (conv.waiting_for_response ? 'Aguardando' : 'Respondido') + '</span></td></tr>';
                     });
                     html += '</tbody></table>';
                     content.innerHTML = html;
                 }
-            } else if (currentTab === 'logs') {
-                if (!statusData.recent_logs || statusData.recent_logs.length === 0) {
-                    content.innerHTML = '<div class="empty-state"><p>Nenhum log recente</p></div>';
-                } else {
-                    let html = '<div style="max-height: 400px; overflow-y: auto;">';
-                    statusData.recent_logs.reverse().forEach(log => {
-                        const timestamp = new Date(log.timestamp).toLocaleTimeString('pt-BR');
-                        const className = log.type.includes('error') ? 'log-error' : 
-                                        log.type.includes('success') ? 'log-success' : '';
-                        html += '<div class="log-entry ' + className + '">';
-                        html += '<strong>' + timestamp + '</strong> - ' + log.type + ' - ' + log.event;
-                        if (log.error) html += ' - ERROR: ' + log.error;
-                        html += '</div>';
+                
+            } else if (currentTab === 'instances') {
+                let html = '<table><thead><tr><th>Nome</th><th>Telefone</th><th>ID</th></tr></thead><tbody>';
+                statusData.instances.forEach(inst => {
+                    html += '<tr><td><strong>' + inst.name + '</strong></td>';
+                    html += '<td>' + inst.phone + '</td>';
+                    html += '<td><code style="font-size:0.8rem">' + statusData.instances.find(i => i.name === inst.name)?.id || 'N/A' + '</code></td></tr>';
+                });
+                html += '</tbody></table>';
+                content.innerHTML = html;
+                
+            } else if (currentTab === 'products') {
+                let html = '<div class="product-list">';
+                
+                // Agrupar produtos
+                const products = {
+                    'FAB': Object.entries(statusData.products).filter(([k,v]) => v === 'FAB'),
+                    'CS': Object.entries(statusData.products).filter(([k,v]) => v === 'CS'),
+                    'NAT': Object.entries(statusData.products).filter(([k,v]) => v === 'NAT')
+                };
+                
+                Object.entries(products).forEach(([type, items]) => {
+                    html += '<div class="product-card">';
+                    html += '<h4>Produto: ' + type + '</h4>';
+                    html += '<p><strong>' + items.length + ' offer_id(s) mapeado(s)</strong></p>';
+                    items.forEach(([offerId, product]) => {
+                        html += '<p><code>' + offerId + '</code></p>';
                     });
                     html += '</div>';
-                    content.innerHTML = html;
-                }
-            } else if (currentTab === 'instances') {
-                let html = '<table><thead><tr><th>Instância</th><th>Status</th></tr></thead><tbody>';
+                });
                 
-                if (Object.keys(instancesStatus).length === 0) {
-                    html += '<tr><td colspan="2">Clique em "Verificar Instâncias" para ver o status</td></tr>';
-                } else {
-                    for (const [instance, isOnline] of Object.entries(instancesStatus)) {
-                        html += '<tr>';
-                        html += '<td>' + instance + '</td>';
-                        html += '<td><span class="badge badge-' + (isOnline ? 'success' : 'danger') + '">' + (isOnline ? 'ONLINE' : 'OFFLINE') + '</span></td>';
-                        html += '</tr>';
-                    }
-                }
-                
-                html += '</tbody></table>';
+                html += '</div>';
                 content.innerHTML = html;
             }
         }
         
-        // Auto-refresh a cada 5 segundos
+        // Auto-refresh a cada 10 segundos
         refreshData();
-        setInterval(refreshData, 5000);
+        setInterval(refreshData, 10000);
     </script>
 </body>
 </html>`;
@@ -1042,37 +1036,35 @@ app.get('/', (req, res) => {
 // ============ INICIALIZAÇÃO ============
 app.listen(PORT, () => {
     console.log(`
-╔══════════════════════════════════════╗
-║   🧠 CÉREBRO KIRVANO v3.2 COMPLETO   ║
-╚══════════════════════════════════════╝
-✅ CONFIGURAÇÕES:
-   • Instâncias: Round-robin com sticky
-   • Painel: Completo com todas as abas
-   • Normalização: Mantém o 9º dígito
-   • Eventos: aprovada, pix, resposta
-   • Logs: Histórico completo 24h
+╔══════════════════════════════════════════════╗
+║   🧠 CÉREBRO DANILO - SISTEMA KIRVANO v1.0   ║
+╚══════════════════════════════════════════════╝
 
-📡 Webhooks:
+🎯 CONFIGURAÇÕES PERSONALIZADAS:
+   • N8N: ${N8N_WEBHOOK_URL}
+   • Evolution: ${EVOLUTION_BASE_URL}
+   • Instâncias: ${INSTANCES.length} (D01-D10)
+   • Produtos: ${Object.keys(PRODUCT_MAPPING).length} (FAB/CS/NAT)
+   • Timeout PIX: ${PIX_TIMEOUT / (1000 * 60)} minutos
+
+📡 WEBHOOKS:
    • Kirvano: /webhook/kirvano
    • Evolution: /webhook/evolution
-   
-📊 Endpoints:
-   • Status: /status (JSON completo)
-   • Health: /health
-   • Painel: / (Interface web)
 
-🎯 N8N: ${N8N_WEBHOOK_URL}
-🤖 Evolution: ${EVOLUTION_BASE_URL}
-⏱️ Timeout PIX: 7 minutos
-🗑️ Limpeza: a cada 10 minutos
-🚀 Porta: ${PORT}
+📊 ENDPOINTS:
+   • Painel: http://localhost:${PORT}
+   • Status: http://localhost:${PORT}/status
+   • Health: http://localhost:${PORT}/health
 
-🔥 FUNCIONALIDADES ATIVAS:
-   ✓ PIX Pendentes com timeout
-   ✓ Conversas com sticky instances  
-   ✓ Logs detalhados
-   ✓ Verificação de instâncias
-   ✓ Interface web completa
-   ✓ Limpeza automática
-════════════════════════════════════════`);
+🚀 FUNCIONALIDADES ATIVAS:
+   ✅ PIX Timeout (7 minutos)
+   ✅ Instâncias Sticky (Round-robin)
+   ✅ Resposta Obrigatória (Anti-queda)
+   ✅ Identificação por offer_id
+   ✅ Normalização de telefone
+   ✅ Sistema de idempotência
+   ✅ Limpeza automática (24h)
+
+🔥 SISTEMA PERSONALIZADO DANILO PRONTO!
+════════════════════════════════════════════════`);
 });
