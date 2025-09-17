@@ -14,18 +14,13 @@ const PORT = process.env.PORT || 3000;
 
 // ============ MAPEAMENTO DE PRODUTOS DANILO (OFFER_ID) ============
 const PRODUCT_MAPPING = {
-    // FABI R$ 24,99
     '668a73bc-2fca-4f12-9331-ef945181cd5c': 'FAB',
-    
-    // CS (3 planos)
-    'e79419d3-5b71-4f90-954b-b05e94de8d98': 'CS', // R$ 19
-    '06539c76-40ee-4811-8351-ab3f5ccc4437': 'CS', // R$ 29  
-    '564bb9bb-718a-4e8b-a843-a2da62f616f0': 'CS', // R$ 49
-    
-    // NAT (3 planos)
-    '08be89d4-96a7-40fd-9d32-ecc4b5cffcdb': 'NAT', // R$ 19
-    '4230eda0-4762-47e6-b8e7-72ab8a2f6f90': 'NAT', // R$ 49
-    'f2289442-c3bc-415f-b6bd-5bc3c3e8e2f7': 'NAT'  // R$ 100
+    'e79419d3-5b71-4f90-954b-b05e94de8d98': 'CS',
+    '06539c76-40ee-4811-8351-ab3f5ccc4437': 'CS',
+    '564bb9bb-718a-4e8b-a843-a2da62f616f0': 'CS',
+    '08be89d4-96a7-40fd-9d32-ecc4b5cffcdb': 'NAT',
+    '4230eda0-4762-47e6-b8e7-72ab8a2f6f90': 'NAT',
+    'f2289442-c3bc-415f-b6bd-5bc3c3e8e2f7': 'NAT'
 };
 
 // ============ INSTÂNCIAS DANILO (D01-D10) ============
