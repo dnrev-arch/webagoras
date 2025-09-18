@@ -14,10 +14,16 @@ const PORT = process.env.PORT || 3000;
 
 // ============ MAPEAMENTO DE PRODUTOS DANILO (OFFER_ID) ============
 const PRODUCT_MAPPING = {
+    // FAB - 2 checkouts ativos
     '668a73bc-2fca-4f12-9331-ef945181cd5c': 'FAB',
+    '69f801e6-a26e-42bb-aa38-89e2767b489f': 'FAB',
+    
+    // CS - 3 produtos
     'e79419d3-5b71-4f90-954b-b05e94de8d98': 'CS',
     '06539c76-40ee-4811-8351-ab3f5ccc4437': 'CS',
     '564bb9bb-718a-4e8b-a843-a2da62f616f0': 'CS',
+    
+    // NAT - 3 produtos
     '08be89d4-96a7-40fd-9d32-ecc4b5cffcdb': 'NAT',
     '4230eda0-4762-47e6-b8e7-72ab8a2f6f90': 'NAT',
     'f2289442-c3bc-415f-b6bd-5bc3c3e8e2f7': 'NAT'
@@ -26,6 +32,8 @@ const PRODUCT_MAPPING = {
 // ============ INSTÂNCIAS DANILO (D01-D10) ============
 const INSTANCES = [
     { name: 'D01', id: 'E72041FBC017-4C78-B82B-A0D90F95FE5F', phone: '557582237133' },
+    { name: 'D02', id: '36B65257D668-413C-BB29-7150092099C7', phone: '557587077645' },
+    { name: 'D03', id: '6B605CD2B735-4A89-A914-7E9508B7481B', phone: '557587077646' },
     { name: 'D04', id: 'F13E2FF90F39-4DC7-8D0D-FDB1395B4546', phone: '557587002116' },
     { name: 'D05', id: '3775095A36FB-43C4-AA9C-5335D120F466', phone: '557587092975' },
     { name: 'D06', id: 'F27A6A27213E-40C3-A334-F3A2261E3631', phone: '555481007975' },
