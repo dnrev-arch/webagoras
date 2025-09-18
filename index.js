@@ -454,15 +454,6 @@ app.post('/webhook/kirvano', async (req, res) => {
 });
 
 // ============ WEBHOOK EVOLUTION - SISTEMA DE RESPOSTA OBRIGATÓRIA ============
-
-// Marca como esperando resposta após enviar para N8N
-const state = conversationState.get(normalizedPhone);
-if (state) {
-    state.waiting_for_response = true;
-    state.last_system_message = new Date();
-    conversationState.set(normalizedPhone, state);
-    console.log(`✅ Estado atualizado - Esperando resposta de ${normalizedPhone}`);
-}
 app.post('/webhook/evolution', async (req, res) => {
     try {
         const data = req.body;
