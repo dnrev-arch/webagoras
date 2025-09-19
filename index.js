@@ -478,6 +478,9 @@ app.post('/webhook/evolution', async (req, res) => {
         const normalized = normalizePhone(clientNumber);
         
         console.log(`\n📱 Evolution: ${normalized} | FromMe: ${fromMe} | Texto: "${messageText.substring(0, 50)}..."`);
+        console.log(`🔍 Conversas ativas: ${conversationState.size}`);
+        console.log(`🔍 Buscando conversa para: ${normalized}`);
+        console.log(`🔍 Conversas existentes:`, Array.from(conversationState.keys()));
         
         // Buscar estado da conversa
         const clientState = conversationState.get(normalized);
