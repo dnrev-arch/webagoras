@@ -491,6 +491,12 @@ app.post('/webhook/evolution', async (req, res) => {
         }
         
         // MENSAGEM ENVIADA PELO SISTEMA
+        console.log(`🔍 fromMe: ${fromMe}`);
+        console.log(`🔍 clientState existe: ${!!clientState}`);
+        if (clientState) {
+        console.log(`🔍 waiting_for_response atual: ${clientState.waiting_for_response}`);
+        console.log(`🔍 response_count atual: ${clientState.response_count}`);
+}
         if (fromMe) {
             console.log(`📤 Sistema enviou MSG para ${normalized} - Habilitando resposta`);
             clientState.waiting_for_response = true;
