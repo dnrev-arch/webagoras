@@ -385,7 +385,7 @@ app.post('/webhook/kirvano', async (req, res) => {
                 instance: instance,
                 original_event: 'pix',
                 response_count: 0,
-                waiting_for_response: true, // DEVE COMEÇAR TRUE
+                waiting_for_response: false, // COMEÇA FALSE - vai virar TRUE após timeout
                 client_name: customerName,
                 amount: totalPrice,
                 pix_url: data.payment?.qrcode_image || data.payment?.qrcode || '',
@@ -425,6 +425,14 @@ app.post('/webhook/kirvano', async (req, res) => {
                     };
                     
                     await sendToN8N(eventData, eventId);
+                    
+                    // ========== CORREÇÃO CRÍTICA - ADICIONAR ESSAS LINHAS ==========
+                    // Marca como esperando resposta após enviar pix_timeout
+                    state.waiting_for_response = true;
+                    state.last_system_message = new Date();
+                    conversationState.set(normalizedPhone, state);
+                    console.log(`✅ Estado atualizado - Esperando resposta de ${normalizedPhone}`);
+                    // ========== FIM DA CORREÇÃO ==========
                 }
                 
                 pixTimeouts.delete(normalizedPhone);
